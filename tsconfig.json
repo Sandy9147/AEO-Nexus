@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@aeo-nexus/ui": ["packages/ui/src"],
+      "@aeo-nexus/ui/*": ["packages/ui/src/*"],
+      "@aeo-nexus/api-client": ["packages/api-client/src"],
+      "@aeo-nexus/api-client/*": ["packages/api-client/src/*"],
+      "@aeo-nexus/contracts": ["packages/contracts/src"],
+      "@aeo-nexus/contracts/*": ["packages/contracts/src/*"],
+      "@aeo-nexus/auth": ["packages/auth/src"],
+      "@aeo-nexus/auth/*": ["packages/auth/src/*"],
+      "@aeo-nexus/permissions": ["packages/permissions/src"],
+      "@aeo-nexus/permissions/*": ["packages/permissions/src/*"],
+      "@aeo-nexus/config": ["packages/config/src"],
+      "@aeo-nexus/config/*": ["packages/config/src/*"],
+      "@aeo-nexus/ai": ["packages/ai/src"],
+      "@aeo-nexus/ai/*": ["packages/ai/src/*"],
+      "@aeo-nexus/workflow-engine": ["packages/workflow-engine/src"],
+      "@aeo-nexus/workflow-engine/*": ["packages/workflow-engine/src/*"]
+    }
+  },
+  "include": ["packages/*/src", "apps/*/src"]
+}

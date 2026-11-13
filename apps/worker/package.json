@@ -1,0 +1,24 @@
+{
+  "name": "@aeo-nexus/worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "ts-node src/main.ts",
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aeo-nexus/config": "workspace:*",
+    "@aeo-nexus/contracts": "workspace:*",
+    "@aeo-nexus/workflow-engine": "workspace:*",
+    "bullmq": "^5.34.12",
+    "ioredis": "^5.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,93 @@
+// Prisma Schema for AEO Nexus
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlatformRole {
+  SUPERADMIN
+  PLATFORM_ADMIN
+  PLATFORM_SUPPORT
+}
+
+enum WorkspaceRole {
+  WORKSPACE_OWNER
+  WORKSPACE_ADMIN
+  AGENCY_MANAGER
+  WORKSPACE_MEMBER
+  WORKSPACE_VIEWER
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  firstName    String        @map("first_name")
+  lastName     String        @map("last_name")
+  platformRole PlatformRole? @map("platform_role")
+  isActive     Boolean       @default(true) @map("is_active")
+
+  memberships  WorkspaceMember[]
+  auditLogs    AuditLog[]
+
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  isActive    Boolean       @default(true) @map("is_active")
+
+  members     WorkspaceMember[]
+  auditLogs   AuditLog[]
+
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String        @map("workspace_id")
+  userId      String        @map("user_id")
+  role        WorkspaceRole @default(WORKSPACE_MEMBER)
+  isActive    Boolean       @default(true) @map("is_active")
+
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model AuditLog {
+  id          String     @id @default(uuid())
+  workspaceId String?    @map("workspace_id")
+  userId      String?    @map("user_id")
+  action      String
+  resource    String
+  details     Json?
+  ipAddress   String?    @map("ip_address")
+
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
