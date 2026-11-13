@@ -219,6 +219,23 @@ export class ProjectsService {
   ): Promise<ProjectDto> {
     await this.workspacesService.verifyMembership(workspaceId, userId);
 
+    if (dto.memberIds && dto.memberIds.length > 0) {
+      const activeMembers = await this.prisma.workspaceMember.findMany({
+        where: {
+          workspaceId,
+          userId: { in: dto.memberIds },
+          isActive: true,
+        },
+        select: { userId: true },
+      });
+      const validMemberIds = new Set(activeMembers.map((m) => m.userId));
+      for (const mId of dto.memberIds) {
+        if (!validMemberIds.has(mId)) {
+          throw new BadRequestException(`User ${mId} is not an active member of this workspace`);
+        }
+      }
+    }
+
     const isArchived = dto.status === 'ARCHIVED';
     const status = isArchived ? 'PLANNING' : (dto.status || 'PLANNING');
 
@@ -540,6 +557,20 @@ export class ProjectsService {
       throw new BadRequestException('Project not found in this workspace');
     }
 
+    if (dto.assignedToId) {
+      const member = await this.prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: dto.assignedToId,
+          },
+        },
+      });
+      if (!member || !member.isActive) {
+        throw new BadRequestException('Assigned user is not an active member of this workspace');
+      }
+    }
+
     const task = await this.prisma.task.create({
       data: {
         projectId: dto.projectId,
@@ -634,6 +665,20 @@ export class ProjectsService {
 
     if (!task || task.workspaceId !== workspaceId) {
       throw new NotFoundException('Task not found in this workspace');
+    }
+
+    if (dto.assignedToId) {
+      const member = await this.prisma.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: dto.assignedToId,
+          },
+        },
+      });
+      if (!member || !member.isActive) {
+        throw new BadRequestException('Assigned user is not an active member of this workspace');
+      }
     }
 
     const data: Prisma.TaskUpdateInput = {};

@@ -101,6 +101,11 @@ model User {
   isActive        Boolean       @default(true) @map("is_active")
   emailVerified   Boolean       @default(false) @map("email_verified")
   emailVerifiedAt DateTime?     @map("email_verified_at")
+  mfaEnabled      Boolean       @default(false) @map("mfa_enabled")
+  mfaSecret       String?       @map("mfa_secret")
+  mfaRecoveryCodes String[]     @default([]) @map("mfa_recovery_codes")
+  mfaLastUsedCode String?       @map("mfa_last_used_code")
+  mfaEnrolledAt   DateTime?     @map("mfa_enrolled_at")
 
   memberships             WorkspaceMember[]
   sessions                Session[]

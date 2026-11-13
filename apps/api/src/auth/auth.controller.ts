@@ -23,6 +23,9 @@ import {
   ForgotPasswordRequest,
   ResetPasswordRequest,
   RefreshTokenRequest,
+  MfaLoginRequest,
+  MfaVerifyRequest,
+  MfaDisableRequest,
 } from '@aeo-nexus/contracts';
 import { REFRESH_COOKIE_NAME, REFRESH_TOKEN_TTL_SECONDS } from '@aeo-nexus/auth';
 
@@ -95,7 +98,53 @@ export class AuthController {
     const clientInfo = this.extractClientInfo(req);
     const result = await this.authService.login(body, clientInfo);
 
-    if (result.tokens.refreshToken) {
+    if ('tokens' in result && result.tokens?.refreshToken) {
+      this.setRefreshCookie(res, result.tokens.refreshToken);
+    }
+
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('mfa/login')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimiterGuard)
+  @RateLimit(10, 60)
+  async mfaLogin(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: MfaLoginRequest,
+  ) {
+    const clientInfo = this.extractClientInfo(req);
+    const result = await this.authService.mfaLogin(body, clientInfo);
+
+    if (result.tokens?.refreshToken) {
+      this.setRefreshCookie(res, result.tokens.refreshToken);
+    }
+
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('mfa/admin-setup')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimiterGuard)
+  @RateLimit(10, 60)
+  async adminMfaSetup(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: { ticket: string; code: string },
+  ) {
+    const clientInfo = this.extractClientInfo(req);
+    const result = await this.authService.completeAdminMfaSetup(body.ticket, body.code, clientInfo);
+
+    if (result.tokens?.refreshToken) {
       this.setRefreshCookie(res, result.tokens.refreshToken);
     }
 
@@ -108,6 +157,8 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimiterGuard)
+  @RateLimit(30, 60)
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -121,6 +172,42 @@ export class AuthController {
       this.setRefreshCookie(res, result.tokens.refreshToken);
     }
 
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('mfa/setup')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async setupMfa(@Req() req: RequestWithUser) {
+    const result = await this.authService.setupMfa(req.user.id);
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('mfa/enable')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async enableMfa(@Req() req: RequestWithUser, @Body() body: MfaVerifyRequest) {
+    const result = await this.authService.verifyAndEnableMfa(req.user.id, body.code);
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Post('mfa/disable')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async disableMfa(@Req() req: RequestWithUser, @Body() body: MfaDisableRequest) {
+    const result = await this.authService.disableMfa(req.user.id, body);
     return {
       success: true,
       data: result,

@@ -190,3 +190,4 @@ ALTER TABLE "website_publications" ADD CONSTRAINT "website_publications_publishe
 
 -- AddForeignKey
 ALTER TABLE "website_generation_runs" ADD CONSTRAINT "website_generation_runs_website_id_fkey" FOREIGN KEY ("website_id") REFERENCES "website_projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

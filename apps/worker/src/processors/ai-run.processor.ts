@@ -12,7 +12,11 @@ export interface AiRunJobData {
 }
 
 export async function processAiRunJob(job: Job<AiRunJobData>): Promise<{ status: string; runId: string; completedAt: string }> {
-  console.log(`[AI Worker] Processing asynchronous AI Run Job: ${job.id} for runId: ${job.data.runId}`);
+  if (!job.data.workspaceId || typeof job.data.workspaceId !== 'string' || job.data.workspaceId.trim().length === 0) {
+    throw new Error('Tenant boundary violation: job missing valid workspaceId');
+  }
+
+  console.log(`[AI Worker] Processing asynchronous AI Run Job: ${job.id} for runId: ${job.data.runId} (workspace: ${job.data.workspaceId})`);
 
   // Validate idempotency: check if already completed
   if (job.attemptsMade > 0) {

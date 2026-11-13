@@ -108,3 +108,4 @@ The editor and preview screens support three live viewport frames:
 - **Desktop**: Full responsive width ($100\%$).
 - **Tablet**: Fixed $768\text{px}$ viewport simulating iPad / tablet viewports.
 - **Mobile**: Fixed $375\text{px}$ viewport simulating modern smartphone screens.
+

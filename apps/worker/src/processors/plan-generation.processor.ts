@@ -10,7 +10,11 @@ export interface PlanGenerationJobData {
 export async function processPlanGenerationJob(
   job: Job<PlanGenerationJobData>,
 ): Promise<{ status: string; planId: string; completedAt: string }> {
-  console.log(`[Plan Worker] Processing Strategic Plan Generation Job: ${job.id} for planId: ${job.data.planId}`);
+  if (!job.data.workspaceId || typeof job.data.workspaceId !== 'string' || job.data.workspaceId.trim().length === 0) {
+    throw new Error('Tenant boundary violation: job missing valid workspaceId');
+  }
+
+  console.log(`[Plan Worker] Processing Strategic Plan Generation Job: ${job.id} for planId: ${job.data.planId} (workspace: ${job.data.workspaceId})`);
 
   if (job.attemptsMade > 0) {
     console.log(`[Plan Worker] Job ${job.id} is on retry attempt #${job.attemptsMade}`);

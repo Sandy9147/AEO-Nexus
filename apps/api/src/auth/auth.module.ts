@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { WorkspaceMembershipGuard } from './guards/workspace.guard';
 import { PlatformRoleGuard } from './guards/platform-role.guard';
@@ -13,6 +14,7 @@ import { EmailModule } from '../email/email.module';
   controllers: [AuthController],
   providers: [
     AuthService,
+    MfaService,
     JwtAuthGuard,
     WorkspaceMembershipGuard,
     PlatformRoleGuard,
@@ -21,6 +23,7 @@ import { EmailModule } from '../email/email.module';
   ],
   exports: [
     AuthService,
+    MfaService,
     JwtAuthGuard,
     WorkspaceMembershipGuard,
     PlatformRoleGuard,

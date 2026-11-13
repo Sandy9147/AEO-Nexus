@@ -52,8 +52,28 @@ export interface HealthCheckResponse {
 export const LoginRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  mfaCode: z.string().optional(),
+  recoveryCode: z.string().optional(),
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+
+export const MfaLoginRequestSchema = z.object({
+  mfaTicket: z.string().min(1, 'MFA ticket is required'),
+  code: z.string().optional(),
+  recoveryCode: z.string().optional(),
+});
+export type MfaLoginRequest = z.infer<typeof MfaLoginRequestSchema>;
+
+export const MfaVerifyRequestSchema = z.object({
+  code: z.string().min(6, 'Verification code is required'),
+});
+export type MfaVerifyRequest = z.infer<typeof MfaVerifyRequestSchema>;
+
+export const MfaDisableRequestSchema = z.object({
+  password: z.string().min(8, 'Password is required to disable MFA'),
+  code: z.string().min(6, 'MFA code is required to disable MFA'),
+});
+export type MfaDisableRequest = z.infer<typeof MfaDisableRequestSchema>;
 
 export const RegisterRequestSchema = z.object({
   email: z.string().email(),
@@ -115,6 +135,14 @@ export interface LoginResponse {
     role: string;
   }>;
 }
+
+export interface MfaChallengeResponse {
+  mfaRequired: true;
+  mfaTicket: string;
+  user: UserProfile;
+}
+
+export type LoginResult = LoginResponse | MfaChallengeResponse;
 
 export interface SessionInfo {
   id: string;

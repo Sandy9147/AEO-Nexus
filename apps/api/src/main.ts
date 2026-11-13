@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ApiConfigSchema, validateConfig } from '@aeo-nexus/config';
+import * as express from 'express';
 
 async function bootstrap() {
   const logger = new Logger('AeoNexusApi');
@@ -18,13 +19,38 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  // Platform Hardening: Strict OWASP Security Headers Middleware
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; frame-ancestors 'none'; connect-src 'self' https:;",
+    );
+    next();
+  });
+
+  // Body payload limits to prevent buffer exhaustion / DoS
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
   const corsOrigins = config.CORS_ORIGINS.split(',').map((o) => o.trim());
 
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-workspace-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-workspace-id',
+      'x-idempotency-key',
+      'x-request-id',
+    ],
   });
 
   await app.listen(config.PORT);

@@ -12,11 +12,16 @@ import {
   LoginRequest,
   RegisterRequest,
   LoginResponse,
+  LoginResult,
+  MfaLoginRequest,
+  MfaVerifyRequest,
+  MfaDisableRequest,
   UserProfile,
   SessionInfo,
 } from '@aeo-nexus/contracts';
 import {
   signJwtHmacSha256,
+  verifyJwtHmacSha256,
   generateOpaqueToken,
   hashToken,
   ACCESS_TOKEN_TTL_SECONDS,
@@ -24,6 +29,7 @@ import {
   EMAIL_VERIFICATION_TTL_SECONDS,
   PASSWORD_RESET_TTL_SECONDS,
 } from '@aeo-nexus/auth';
+import { MfaService } from './mfa.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -33,6 +39,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly mfaService: MfaService,
   ) {}
 
   private getJwtSecret(): string {
@@ -126,12 +133,82 @@ export class AuthService {
   }
 
   /**
-   * User Login with verification gate, session creation, and refresh token rotation
+   * Helper to create session, audit log, and return LoginResponse
+   */
+  private async createSessionAndTokens(
+    user: any,
+    clientInfo?: { ipAddress?: string; userAgent?: string },
+  ): Promise<LoginResponse> {
+    const secret = this.getJwtSecret();
+    const accessToken = signJwtHmacSha256(
+      {
+        sub: user.id,
+        email: user.email,
+        platformRole: user.platformRole,
+        iss: 'aeo-nexus-api',
+        aud: 'aeo-nexus-clients',
+        exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SECONDS,
+      },
+      secret,
+    );
+
+    const rawRefreshToken = generateOpaqueToken(32);
+    const refreshTokenHash = hashToken(rawRefreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
+
+    await this.prisma.session.create({
+      data: {
+        userId: user.id,
+        tokenHash: refreshTokenHash,
+        ipAddress: clientInfo?.ipAddress,
+        userAgent: clientInfo?.userAgent,
+        expiresAt,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: 'auth:login',
+        resource: 'session',
+        ipAddress: clientInfo?.ipAddress,
+      },
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        platformRole: user.platformRole,
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt.toISOString(),
+      },
+      tokens: {
+        accessToken,
+        refreshToken: rawRefreshToken,
+        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      },
+      activeWorkspaces: (user.memberships || [])
+        .filter((m: any) => m.isActive && m.workspace?.isActive)
+        .map((m: any) => ({
+          id: m.workspaceId,
+          name: m.workspace.name,
+          slug: m.workspace.slug,
+          role: m.role,
+        })),
+    };
+  }
+
+  /**
+   * User Login with verification gate, session creation, and refresh token rotation.
+   * Multi-Factor Authentication is enforced for administrator roles and users with MFA enabled.
    */
   async login(
     dto: LoginRequest,
     clientInfo?: { ipAddress?: string; userAgent?: string },
-  ): Promise<LoginResponse> {
+  ): Promise<LoginResult> {
     const email = dto.email.trim().toLowerCase();
 
     const user = await this.prisma.user.findUnique({
@@ -163,69 +240,319 @@ export class AuthService {
       );
     }
 
-    // Generate Short-lived Access Token (15 mins)
     const secret = this.getJwtSecret();
-    const accessToken = signJwtHmacSha256(
-      {
-        sub: user.id,
-        email: user.email,
-        platformRole: user.platformRole,
-        iss: 'aeo-nexus-api',
-        aud: 'aeo-nexus-clients',
-        exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SECONDS,
-      },
-      secret,
-    );
+    const isAdmin =
+      user.platformRole === 'PLATFORM_SUPER_ADMIN' ||
+      user.platformRole === 'PLATFORM_ADMIN' ||
+      user.platformRole === 'SUPERADMIN';
 
-    // Generate Refresh Token & Session
-    const rawRefreshToken = generateOpaqueToken(32);
-    const refreshTokenHash = hashToken(rawRefreshToken);
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000);
+    // Administrator MFA Enforcement or user-enabled MFA
+    if (user.mfaEnabled || isAdmin) {
+      if (!user.mfaEnabled && isAdmin) {
+        // Force MFA enrollment for admins before production access
+        const mfaTicket = signJwtHmacSha256(
+          {
+            sub: user.id,
+            email: user.email,
+            type: 'mfa_setup_challenge',
+            exp: Math.floor(Date.now() / 1000) + 600,
+          },
+          secret,
+        );
 
-    await this.prisma.session.create({
-      data: {
-        userId: user.id,
-        tokenHash: refreshTokenHash,
-        ipAddress: clientInfo?.ipAddress,
-        userAgent: clientInfo?.userAgent,
-        expiresAt,
+        return {
+          mfaRequired: true,
+          mfaSetupRequired: true,
+          mfaTicket,
+          message:
+            'MFA is mandatory for administrative accounts. Please set up MFA to complete login.',
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            platformRole: user.platformRole,
+            emailVerified: user.emailVerified,
+            createdAt: user.createdAt.toISOString(),
+          },
+        } as any;
+      }
+
+      // MFA is enabled on user account
+      if (dto.mfaCode) {
+        const { valid, usedCode } = this.mfaService.verifyTotp(
+          user.mfaSecret || '',
+          dto.mfaCode,
+          user.mfaLastUsedCode,
+        );
+        if (!valid) {
+          throw new UnauthorizedException('Invalid or expired MFA code');
+        }
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { mfaLastUsedCode: usedCode },
+        });
+      } else if (dto.recoveryCode) {
+        const { valid, remainingHashedCodes } = this.mfaService.verifyAndConsumeRecoveryCode(
+          dto.recoveryCode,
+          user.mfaRecoveryCodes || [],
+        );
+        if (!valid) {
+          throw new UnauthorizedException('Invalid or already used recovery code');
+        }
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { mfaRecoveryCodes: remainingHashedCodes },
+        });
+      } else {
+        // Return MFA challenge
+        const mfaTicket = signJwtHmacSha256(
+          {
+            sub: user.id,
+            email: user.email,
+            type: 'mfa_challenge',
+            exp: Math.floor(Date.now() / 1000) + 300,
+          },
+          secret,
+        );
+
+        return {
+          mfaRequired: true,
+          mfaTicket,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            platformRole: user.platformRole,
+            emailVerified: user.emailVerified,
+            createdAt: user.createdAt.toISOString(),
+          },
+        };
+      }
+    }
+
+    return this.createSessionAndTokens(user, clientInfo);
+  }
+
+  /**
+   * Complete MFA login challenge with TOTP code or recovery code
+   */
+  async mfaLogin(
+    dto: MfaLoginRequest,
+    clientInfo?: { ipAddress?: string; userAgent?: string },
+  ): Promise<LoginResponse> {
+    const secret = this.getJwtSecret();
+    let payload: { sub: string; email: string; type: string };
+    try {
+      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string }>(
+        dto.mfaTicket,
+        secret,
+      );
+    } catch {
+      throw new UnauthorizedException('Invalid or expired MFA ticket');
+    }
+
+    if (payload.type !== 'mfa_challenge') {
+      throw new UnauthorizedException('Invalid MFA ticket purpose');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        memberships: {
+          include: { workspace: true },
+        },
       },
     });
 
-    // Audit log
-    await this.prisma.auditLog.create({
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Account not found or deactivated');
+    }
+
+    if (dto.code) {
+      const { valid, usedCode } = this.mfaService.verifyTotp(
+        user.mfaSecret || '',
+        dto.code,
+        user.mfaLastUsedCode,
+      );
+      if (!valid) {
+        throw new UnauthorizedException('Invalid or expired MFA code');
+      }
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { mfaLastUsedCode: usedCode },
+      });
+    } else if (dto.recoveryCode) {
+      const { valid, remainingHashedCodes } = this.mfaService.verifyAndConsumeRecoveryCode(
+        dto.recoveryCode,
+        user.mfaRecoveryCodes || [],
+      );
+      if (!valid) {
+        throw new UnauthorizedException('Invalid or already used recovery code');
+      }
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { mfaRecoveryCodes: remainingHashedCodes },
+      });
+    } else {
+      throw new BadRequestException('MFA verification code or recovery code is required');
+    }
+
+    return this.createSessionAndTokens(user, clientInfo);
+  }
+
+  /**
+   * Initiate MFA setup for authenticated user
+   */
+  async setupMfa(userId: string): Promise<{ secret: string; otpauthUri: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const secret = this.mfaService.generateSecret();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mfaSecret: secret },
+    });
+
+    const otpauthUri = this.mfaService.getOtpAuthUri(secret, user.email);
+    return { secret, otpauthUri };
+  }
+
+  /**
+   * Verify and enable MFA with TOTP code
+   */
+  async verifyAndEnableMfa(
+    userId: string,
+    code: string,
+  ): Promise<{ enabled: boolean; recoveryCodes: string[] }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.mfaSecret) {
+      throw new BadRequestException('MFA setup has not been initiated');
+    }
+
+    const { valid, usedCode } = this.mfaService.verifyTotp(user.mfaSecret, code);
+    if (!valid) {
+      throw new BadRequestException(
+        'Invalid verification code. Please check your authenticator and try again.',
+      );
+    }
+
+    const { plaintextCodes, hashedCodes } = this.mfaService.generateRecoveryCodes(10);
+    await this.prisma.user.update({
+      where: { id: userId },
       data: {
-        userId: user.id,
-        action: 'auth:login',
-        resource: 'session',
-        ipAddress: clientInfo?.ipAddress,
+        mfaEnabled: true,
+        mfaRecoveryCodes: hashedCodes,
+        mfaEnrolledAt: new Date(),
+        mfaLastUsedCode: usedCode,
       },
     });
 
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        platformRole: user.platformRole,
-        emailVerified: user.emailVerified,
-        createdAt: user.createdAt.toISOString(),
+    return { enabled: true, recoveryCodes: plaintextCodes };
+  }
+
+  /**
+   * Complete MFA enrollment during admin login challenge
+   */
+  async completeAdminMfaSetup(
+    ticket: string,
+    code: string,
+    clientInfo?: { ipAddress?: string; userAgent?: string },
+  ): Promise<LoginResponse & { recoveryCodes: string[] }> {
+    const secret = this.getJwtSecret();
+    let payload: { sub: string; email: string; type: string };
+    try {
+      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string }>(ticket, secret);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired MFA ticket');
+    }
+
+    if (payload.type !== 'mfa_setup_challenge') {
+      throw new UnauthorizedException('Invalid MFA ticket purpose');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        memberships: {
+          include: { workspace: true },
+        },
       },
-      tokens: {
-        accessToken,
-        refreshToken: rawRefreshToken,
-        expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    });
+    if (!user || !user.isActive) throw new UnauthorizedException('User not found or deactivated');
+
+    let mfaSecret = user.mfaSecret;
+    if (!mfaSecret) {
+      mfaSecret = this.mfaService.generateSecret();
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { mfaSecret },
+      });
+    }
+
+    const { valid, usedCode } = this.mfaService.verifyTotp(mfaSecret, code);
+    if (!valid) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    const { plaintextCodes, hashedCodes } = this.mfaService.generateRecoveryCodes(10);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaEnabled: true,
+        mfaRecoveryCodes: hashedCodes,
+        mfaEnrolledAt: new Date(),
+        mfaLastUsedCode: usedCode,
       },
-      activeWorkspaces: user.memberships
-        .filter((m) => m.isActive && m.workspace.isActive)
-        .map((m) => ({
-          id: m.workspaceId,
-          name: m.workspace.name,
-          slug: m.workspace.slug,
-          role: m.role,
-        })),
-    };
+    });
+
+    const loginRes = await this.createSessionAndTokens(user, clientInfo);
+    return { ...loginRes, recoveryCodes: plaintextCodes };
+  }
+
+  /**
+   * Disable MFA for non-admin accounts
+   */
+  async disableMfa(
+    userId: string,
+    dto: MfaDisableRequest,
+  ): Promise<{ disabled: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const isAdmin =
+      user.platformRole === 'PLATFORM_SUPER_ADMIN' ||
+      user.platformRole === 'PLATFORM_ADMIN' ||
+      user.platformRole === 'SUPERADMIN';
+    if (isAdmin) {
+      throw new BadRequestException(
+        'MFA is mandatory for administrative accounts and cannot be disabled',
+      );
+    }
+
+    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    const { valid } = this.mfaService.verifyTotp(user.mfaSecret || '', dto.code);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid MFA code');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfaEnabled: false,
+        mfaSecret: null,
+        mfaRecoveryCodes: [],
+        mfaLastUsedCode: null,
+        mfaEnrolledAt: null,
+      },
+    });
+
+    return { disabled: true };
   }
 
   /**

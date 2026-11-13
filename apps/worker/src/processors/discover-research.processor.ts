@@ -10,7 +10,11 @@ export interface DiscoverResearchJobData {
 export async function processDiscoverResearchJob(
   job: Job<DiscoverResearchJobData>,
 ): Promise<{ status: string; researchId: string; completedAt: string }> {
-  console.log(`[Discover Worker] Processing Discover Research Job: ${job.id} for researchId: ${job.data.researchId}`);
+  if (!job.data.workspaceId || typeof job.data.workspaceId !== 'string' || job.data.workspaceId.trim().length === 0) {
+    throw new Error('Tenant boundary violation: job missing valid workspaceId');
+  }
+
+  console.log(`[Discover Worker] Processing Discover Research Job: ${job.id} for researchId: ${job.data.researchId} (workspace: ${job.data.workspaceId})`);
 
   if (job.attemptsMade > 0) {
     console.log(`[Discover Worker] Job ${job.id} is on retry attempt #${job.attemptsMade}`);
