@@ -33,24 +33,55 @@ Every incoming request must authenticate using high-entropy cryptographic creden
 
 ---
 
-## 3. Multi-Factor Authentication (MFA / 2FA)
+## 3. Multi-Factor Authentication (MFA / 2FA) & Cryptographic Hardening
 
-### 3.1 RFC 6238 TOTP Engine
+### 3.1 Authenticated Encryption at Rest (AES-256-GCM)
+- **Algorithm**: AES-256-GCM authenticated encryption for all TOTP secrets stored in PostgreSQL (`mfa_secret`).
+- **Initialization Vector (Nonce)**: 96-bit (12-byte) cryptographically secure random IV generated per encryption operation via `crypto.randomBytes(12)`. IVs are never reused.
+- **Authentication Tag**: 128-bit (16-byte) GCM authentication tag authenticating both ciphertext integrity and payload structure.
+- **Storage Envelope**: Versioned envelope format: `v1:<iv_hex>:<auth_tag_hex>:<ciphertext_hex>`.
+- **Key Management**: Master key derived via HKDF-SHA256 from `JWT_SECRET` with dedicated salt `aeo-nexus-mfa-pepper-salt-v1` and context info `mfa-totp-encryption-v1`, or loaded from explicitly configured `MFA_ENCRYPTION_KEY` environment variable. Plaintext keys and secrets are never logged.
+- **Tamper Resistance**: Tampered ciphertexts or altered authentication tags immediately throw exceptions; silent fallbacks to unencrypted plaintext are strictly prohibited.
+- **Zero-Downtime Migration**: Legacy unencrypted secrets are automatically detected, decrypted, and upgraded in-place to `v1` authenticated encryption on first authentication.
+
+### 3.2 RFC 6238 TOTP Engine & Counter-Based Replay Protection
 - **Standard**: RFC 6238 Time-Based One-Time Password algorithm with RFC 4648 Base32 secret encoding.
 - **Secret Generation**: 160-bit (20-byte) cryptographically secure random secret yielding 32-character Base32 string.
 - **URI & QR Provisioning**: Formats standard `otpauth://totp/AEO%20Nexus:<email>?secret=<secret>&issuer=AEO%20Nexus&algorithm=SHA1&digits=6&period=30` compatible with Google Authenticator, 1Password, and Apple Keychain.
-- **Drift Tolerance**: Tolerates +/- 30-second window (3 time steps total: past, current, future) for client clock drift.
-- **Replay Attack Protection**: Compares verified code against `mfaLastUsedCode`. Replaying the same 6-digit TOTP within the active 30-second window is rejected immediately.
+- **Drift Tolerance Window**: Calculates RFC 6238 counter step $C = \lfloor \text{timestampMs} / 1000 / 30 \rfloor$ and tests candidates $[C, C-1, C+1]$ (+/- 30 seconds drift tolerance).
+- **Time-Step Counter Tracking**: Replaces simple string code matching with RFC 6238 counter step verification (`mfa_last_used_step` in PostgreSQL). Any candidate counter step $S \le \text{lastAcceptedStep}$ is strictly rejected, preventing replay attacks across the entire drift window.
+- **Race Condition Resistance**: Atomic row-level conditional database update:
+  ```ts
+  const updateRes = await prisma.user.updateMany({
+    where: {
+      id: user.id,
+      OR: [{ mfaLastUsedStep: null }, { mfaLastUsedStep: { lt: acceptedStep } }]
+    },
+    data: { mfaLastUsedStep: acceptedStep, mfaLastUsedCode: code }
+  });
+  if (updateRes.count === 0) throw new UnauthorizedException('MFA time step has already been consumed (replay prevention)');
+  ```
+  In concurrent submission race conditions, exactly one transaction succeeds and the duplicate request is rejected.
 
-### 3.2 Single-Use Backup Recovery Codes
-- **Generation**: 10 cryptographically random 8-character codes (`XXXX-XXXX`).
-- **Storage**: SHA-256 hashed values stored in Prisma `mfa_recovery_codes`. Plaintext codes are displayed to the user only once upon initial enrollment.
-- **Consumption**: Upon submission, the matching SHA-256 hash is located, atomically consumed, and permanently removed from the user's recovery array. Subsequent reuse attempts fail immediately.
+### 3.3 Keyed Backup Recovery Codes (HMAC-SHA256)
+- **Generation**: 10 cryptographically random codes (`XXXXXX-XXXXXX` generated via 6 hex bytes).
+- **Keyed Hashing**: Keyed HMAC-SHA256 using server-side pepper (`MFA_RECOVERY_PEPPER` or derived via HKDF-SHA256 with salt `aeo-nexus-recovery-salt-v1`).
+- **Atomic Consumption**: Atomic conditional database array update:
+  ```ts
+  const updateRes = await prisma.user.updateMany({
+    where: { id: user.id, mfaRecoveryCodes: { has: targetHash } },
+    data: { mfaRecoveryCodes: remainingHashedCodes }
+  });
+  if (updateRes.count === 0) throw new UnauthorizedException('Recovery code has already been consumed');
+  ```
+  Prevents duplicate consumption races; replayed codes fail verification immediately. Plaintext recovery codes are never stored and are presented to the user only once at enrollment.
 
-### 3.3 Mandatory Administrator Enforcement
+### 3.4 Mandatory Administrator Enforcement & Challenge Token Confinement
 - Administrative platform roles (`PLATFORM_SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPERADMIN`) are barred from password-only sign-in.
-- Unenrolled administrators receive an ephemeral `mfa_setup_challenge` JWT and must complete TOTP enrollment before gaining platform dashboard access.
-- Administrative accounts cannot disable MFA (`disableMfa` throws `BadRequestException: MFA is mandatory for administrative accounts and cannot be disabled`).
+- Unenrolled administrators receive an ephemeral `mfa_setup_challenge` JWT (5-minute expiration) and must complete TOTP enrollment before gaining platform dashboard access.
+- **Challenge Token Confinement**: `JwtAuthGuard` explicitly rejects challenge tokens (`mfa_challenge`, `mfa_setup_challenge`) from accessing any protected resource, returning 401 Unauthorized.
+- **Zero Session Premature Creation**: Password authentication during MFA challenges creates zero sessions or refresh tokens; session and token creation occurs only upon verified second-factor completion.
+- **Administrative MFA Immutability**: Administrative accounts cannot disable MFA (`disableMfa` throws `BadRequestException: MFA is mandatory for administrative accounts and cannot be disabled`).
 
 ---
 

@@ -249,13 +249,13 @@ export class AuthService {
     // Administrator MFA Enforcement or user-enabled MFA
     if (user.mfaEnabled || isAdmin) {
       if (!user.mfaEnabled && isAdmin) {
-        // Force MFA enrollment for admins before production access
+        // Force MFA enrollment for admins before production access (short-lived 5-minute challenge)
         const mfaTicket = signJwtHmacSha256(
           {
             sub: user.id,
             email: user.email,
             type: 'mfa_setup_challenge',
-            exp: Math.floor(Date.now() / 1000) + 600,
+            exp: Math.floor(Date.now() / 1000) + 300,
           },
           secret,
         );
@@ -278,34 +278,73 @@ export class AuthService {
         } as any;
       }
 
+      // Decrypt stored secret with authenticated encryption
+      let plaintextSecret = '';
+      if (user.mfaSecret) {
+        plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
+        // Automatic in-place encryption upgrade for legacy plaintext secrets
+        if (!user.mfaSecret.startsWith('v1:')) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { mfaSecret: this.mfaService.encryptSecret(plaintextSecret) },
+          });
+        }
+      }
+
       // MFA is enabled on user account
       if (dto.mfaCode) {
-        const { valid, usedCode } = this.mfaService.verifyTotp(
-          user.mfaSecret || '',
+        const { valid, acceptedStep, code } = this.mfaService.verifyTotpCounter(
+          plaintextSecret,
           dto.mfaCode,
-          user.mfaLastUsedCode,
+          user.mfaLastUsedStep,
         );
-        if (!valid) {
+        if (!valid || !acceptedStep) {
           throw new UnauthorizedException('Invalid or expired MFA code');
         }
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { mfaLastUsedCode: usedCode },
+
+        // Atomic row-level conditional update to prevent concurrent replay of the same time step
+        const updateRes = await this.prisma.user.updateMany({
+          where: {
+            id: user.id,
+            OR: [
+              { mfaLastUsedStep: null },
+              { mfaLastUsedStep: { lt: acceptedStep } },
+            ],
+          },
+          data: {
+            mfaLastUsedStep: acceptedStep,
+            mfaLastUsedCode: code,
+          },
         });
+
+        if (updateRes.count === 0) {
+          throw new UnauthorizedException('MFA time step has already been consumed (replay prevention)');
+        }
       } else if (dto.recoveryCode) {
-        const { valid, remainingHashedCodes } = this.mfaService.verifyAndConsumeRecoveryCode(
+        const { valid, matchedHash, remainingHashedCodes } = this.mfaService.verifyAndConsumeRecoveryCode(
           dto.recoveryCode,
           user.mfaRecoveryCodes || [],
         );
-        if (!valid) {
+        if (!valid || !matchedHash) {
           throw new UnauthorizedException('Invalid or already used recovery code');
         }
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { mfaRecoveryCodes: remainingHashedCodes },
+
+        // Atomic conditional consumption to prevent concurrent duplicate consumption
+        const updateRes = await this.prisma.user.updateMany({
+          where: {
+            id: user.id,
+            mfaRecoveryCodes: { has: matchedHash },
+          },
+          data: {
+            mfaRecoveryCodes: remainingHashedCodes,
+          },
         });
+
+        if (updateRes.count === 0) {
+          throw new UnauthorizedException('Recovery code has already been consumed');
+        }
       } else {
-        // Return MFA challenge
+        // Return MFA challenge (short-lived 5-minute challenge)
         const mfaTicket = signJwtHmacSha256(
           {
             sub: user.id,
@@ -371,30 +410,67 @@ export class AuthService {
     }
 
     if (dto.code) {
-      const { valid, usedCode } = this.mfaService.verifyTotp(
-        user.mfaSecret || '',
+      let plaintextSecret = '';
+      if (user.mfaSecret) {
+        plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
+        if (!user.mfaSecret.startsWith('v1:')) {
+          await this.prisma.user.update({
+            where: { id: user.id },
+            data: { mfaSecret: this.mfaService.encryptSecret(plaintextSecret) },
+          });
+        }
+      }
+
+      const { valid, acceptedStep, code } = this.mfaService.verifyTotpCounter(
+        plaintextSecret,
         dto.code,
-        user.mfaLastUsedCode,
+        user.mfaLastUsedStep,
       );
-      if (!valid) {
+      if (!valid || !acceptedStep) {
         throw new UnauthorizedException('Invalid or expired MFA code');
       }
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { mfaLastUsedCode: usedCode },
+
+      // Atomic row-level conditional update
+      const updateRes = await this.prisma.user.updateMany({
+        where: {
+          id: user.id,
+          OR: [
+            { mfaLastUsedStep: null },
+            { mfaLastUsedStep: { lt: acceptedStep } },
+          ],
+        },
+        data: {
+          mfaLastUsedStep: acceptedStep,
+          mfaLastUsedCode: code,
+        },
       });
+
+      if (updateRes.count === 0) {
+        throw new UnauthorizedException('MFA time step has already been consumed (replay prevention)');
+      }
     } else if (dto.recoveryCode) {
-      const { valid, remainingHashedCodes } = this.mfaService.verifyAndConsumeRecoveryCode(
+      const { valid, matchedHash, remainingHashedCodes } = this.mfaService.verifyAndConsumeRecoveryCode(
         dto.recoveryCode,
         user.mfaRecoveryCodes || [],
       );
-      if (!valid) {
+      if (!valid || !matchedHash) {
         throw new UnauthorizedException('Invalid or already used recovery code');
       }
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { mfaRecoveryCodes: remainingHashedCodes },
+
+      // Atomic conditional update to prevent concurrent duplicate consumption
+      const updateRes = await this.prisma.user.updateMany({
+        where: {
+          id: user.id,
+          mfaRecoveryCodes: { has: matchedHash },
+        },
+        data: {
+          mfaRecoveryCodes: remainingHashedCodes,
+        },
       });
+
+      if (updateRes.count === 0) {
+        throw new UnauthorizedException('Recovery code has already been consumed');
+      }
     } else {
       throw new BadRequestException('MFA verification code or recovery code is required');
     }
@@ -410,9 +486,14 @@ export class AuthService {
     if (!user) throw new NotFoundException('User not found');
 
     const secret = this.mfaService.generateSecret();
+    const encryptedSecret = this.mfaService.encryptSecret(secret);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { mfaSecret: secret },
+      data: {
+        mfaSecret: encryptedSecret,
+        mfaLastUsedStep: null,
+        mfaLastUsedCode: null,
+      },
     });
 
     const otpauthUri = this.mfaService.getOtpAuthUri(secret, user.email);
@@ -431,23 +512,46 @@ export class AuthService {
       throw new BadRequestException('MFA setup has not been initiated');
     }
 
-    const { valid, usedCode } = this.mfaService.verifyTotp(user.mfaSecret, code);
-    if (!valid) {
+    const plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
+    const { valid, acceptedStep, code: validCode } = this.mfaService.verifyTotpCounter(
+      plaintextSecret,
+      code,
+      user.mfaLastUsedStep,
+    );
+    if (!valid || !acceptedStep) {
       throw new BadRequestException(
         'Invalid verification code. Please check your authenticator and try again.',
       );
     }
 
+    // Upgrade in-place to v1 encryption if not yet formatted
+    let storedSecret = user.mfaSecret;
+    if (!user.mfaSecret.startsWith('v1:')) {
+      storedSecret = this.mfaService.encryptSecret(plaintextSecret);
+    }
+
     const { plaintextCodes, hashedCodes } = this.mfaService.generateRecoveryCodes(10);
-    await this.prisma.user.update({
-      where: { id: userId },
+    const updateRes = await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        OR: [
+          { mfaLastUsedStep: null },
+          { mfaLastUsedStep: { lt: acceptedStep } },
+        ],
+      },
       data: {
+        mfaSecret: storedSecret,
         mfaEnabled: true,
         mfaRecoveryCodes: hashedCodes,
         mfaEnrolledAt: new Date(),
-        mfaLastUsedCode: usedCode,
+        mfaLastUsedStep: acceptedStep,
+        mfaLastUsedCode: validCode,
       },
     });
+
+    if (updateRes.count === 0) {
+      throw new BadRequestException('MFA verification code has already been consumed');
+    }
 
     return { enabled: true, recoveryCodes: plaintextCodes };
   }
@@ -482,30 +586,45 @@ export class AuthService {
     });
     if (!user || !user.isActive) throw new UnauthorizedException('User not found or deactivated');
 
-    let mfaSecret = user.mfaSecret;
-    if (!mfaSecret) {
-      mfaSecret = this.mfaService.generateSecret();
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { mfaSecret },
-      });
+    let plaintextSecret = '';
+    if (!user.mfaSecret) {
+      plaintextSecret = this.mfaService.generateSecret();
+    } else {
+      plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
     }
 
-    const { valid, usedCode } = this.mfaService.verifyTotp(mfaSecret, code);
-    if (!valid) {
+    const { valid, acceptedStep, code: validCode } = this.mfaService.verifyTotpCounter(
+      plaintextSecret,
+      code,
+      user.mfaLastUsedStep,
+    );
+    if (!valid || !acceptedStep) {
       throw new BadRequestException('Invalid verification code');
     }
 
+    const encryptedSecret = this.mfaService.encryptSecret(plaintextSecret);
     const { plaintextCodes, hashedCodes } = this.mfaService.generateRecoveryCodes(10);
-    await this.prisma.user.update({
-      where: { id: user.id },
+    const updateRes = await this.prisma.user.updateMany({
+      where: {
+        id: user.id,
+        OR: [
+          { mfaLastUsedStep: null },
+          { mfaLastUsedStep: { lt: acceptedStep } },
+        ],
+      },
       data: {
+        mfaSecret: encryptedSecret,
         mfaEnabled: true,
         mfaRecoveryCodes: hashedCodes,
         mfaEnrolledAt: new Date(),
-        mfaLastUsedCode: usedCode,
+        mfaLastUsedStep: acceptedStep,
+        mfaLastUsedCode: validCode,
       },
     });
+
+    if (updateRes.count === 0) {
+      throw new BadRequestException('MFA verification code has already been consumed');
+    }
 
     const loginRes = await this.createSessionAndTokens(user, clientInfo);
     return { ...loginRes, recoveryCodes: plaintextCodes };
@@ -536,8 +655,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid password');
     }
 
-    const { valid } = this.mfaService.verifyTotp(user.mfaSecret || '', dto.code);
-    if (!valid) {
+    if (!user.mfaSecret) {
+      throw new BadRequestException('MFA is not enabled on this account');
+    }
+
+    const plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
+    const { valid, acceptedStep } = this.mfaService.verifyTotpCounter(
+      plaintextSecret,
+      dto.code,
+      user.mfaLastUsedStep,
+    );
+    if (!valid || !acceptedStep) {
       throw new UnauthorizedException('Invalid MFA code');
     }
 
@@ -548,6 +676,7 @@ export class AuthService {
         mfaSecret: null,
         mfaRecoveryCodes: [],
         mfaLastUsedCode: null,
+        mfaLastUsedStep: null,
         mfaEnrolledAt: null,
       },
     });

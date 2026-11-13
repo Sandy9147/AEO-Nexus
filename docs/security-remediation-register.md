@@ -18,13 +18,17 @@ This register documents all security findings identified during the Phase 7A Ful
 | **SEC-008** | **Subdomain Reservation & Collision Bypass**<br>Potential claiming of reserved subdomains or duplicate live publications. | **High** | `apps/api/src/build/website.service.ts`<br>`packages/contracts/src/index.ts` | Verified and strengthened `RESERVED_SUBDOMAINS` validation and cross-workspace publication collision prevention. | Scenarios 23, 24 | **RESOLVED & VERIFIED** |
 | **SEC-009** | **Stored XSS in Visual Builder Payloads**<br>User-supplied text and links in website components could contain scripts or malicious URL schemes. | **High** | `apps/api/src/build/website-renderer.service.ts` | Reinforced recursive content sanitization stripping `<script>` tags, inline event handlers, and blocking `javascript:`, `data:`, `vbscript:` protocols. | Scenario 26 | **RESOLVED & VERIFIED** |
 | **SEC-010** | **Refresh Token Reuse Detection**<br>Replaying old refresh tokens could allow concurrent hijacked sessions. | **Critical** | `apps/api/src/auth/auth.service.ts` | Verified automated session family revocation upon refresh token reuse detection, accompanied by audit logging and warning alerts. | Scenario 4 | **RESOLVED & VERIFIED** |
+| **SEC-MFA-001** | **TOTP Secret Plaintext at Rest**<br>MFA secrets stored unencrypted in PostgreSQL database. | **High** | `apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts` | Implemented AES-256-GCM authenticated encryption with 96-bit unique IVs, 128-bit authentication tags, and versioned `v1:` envelopes. Secrets and keys are never logged. Zero-downtime migration upgrades legacy secrets in-place. | Phase 7A.1 Scenarios 1, 2, 7, 16 | **RESOLVED & VERIFIED** |
+| **SEC-MFA-002** | **Code-Only Replay Prevention Flaw**<br>Last-code-only matching allowed replaying valid codes across past/future drift steps. | **High** | `apps/api/prisma/schema.prisma`<br>`apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts` | Added `mfa_last_used_step` to PostgreSQL. Implemented RFC 6238 counter step tracking rejecting any counter $S \le \text{lastAcceptedStep}$. Enforced atomic conditional updates (`where: { OR: [{ mfaLastUsedStep: null }, { mfaLastUsedStep: { lt: acceptedStep } }] }`) to eliminate race conditions. | Phase 7A.1 Scenarios 8, 9, 10 | **RESOLVED & VERIFIED** |
+| **SEC-MFA-003** | **Unsalted / Unkeyed Recovery Codes**<br>Recovery backup codes hashed with raw unkeyed SHA-256 vulnerable to offline dictionary attack if DB leaked. | **Medium** | `apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts` | Upgraded to keyed HMAC-SHA256 with server-side pepper (`MFA_RECOVERY_PEPPER` or HKDF derivation). Implemented atomic conditional consumption (`mfaRecoveryCodes: { has: targetHash }`). Plaintext codes never persisted. | Phase 7A.1 Scenarios 3, 11, 12, 13 | **RESOLVED & VERIFIED** |
+| **SEC-MFA-004** | **MFA Challenge Token Privilege Escalation**<br>Short-lived challenge tickets could potentially be presented to resource endpoints. | **High** | `apps/api/src/auth/guards/jwt-auth.guard.ts`<br>`apps/api/src/auth/auth.service.ts` | Hardened `JwtAuthGuard` to explicitly reject tokens with `type: 'mfa_challenge'` or `'mfa_setup_challenge'`. Guaranteed zero session or token creation before verified second-factor completion. | Phase 7A.1 Scenarios 4, 5, 6 | **RESOLVED & VERIFIED** |
 
 ---
 
 ## Remediation Sign-Off Summary
-- **Total Security Findings Identified**: 10
-- **Total Remediations Implemented**: 10
-- **Automated Test Scenarios Executed**: 30
-- **Test Pass Rate**: 100% (30/30 Passed)
-- **Production Baseline Status**: **APPROVED FOR PRODUCTION ACCESS**
+- **Phase 7A Baseline Security Findings**: 10 (10/10 Resolved & Verified)
+- **Phase 7A.1 MFA Cryptographic Hardening Findings**: 4 (4/4 Resolved & Verified)
+- **Automated Test Scenarios Executed**: 46 (30 Phase 7A + 16 Phase 7A.1)
+- **Test Pass Rate**: 100% (46/46 Passed)
+- **Production Baseline Status**: **APPROVED & CRYPTOGRAPHICALLY HARDENED**
 

@@ -34,7 +34,12 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const secret = this.getJwtSecret();
-      const payload = verifyJwtHmacSha256<JwtTokenPayload>(token, secret);
+      const payload = verifyJwtHmacSha256<JwtTokenPayload & { type?: string }>(token, secret);
+
+      // Security Hardening: Challenge tokens cannot be used as resource access tokens
+      if (payload.type === 'mfa_challenge' || payload.type === 'mfa_setup_challenge') {
+        throw new UnauthorizedException('MFA challenge token cannot be used for resource authorization');
+      }
 
       request.user = {
         id: payload.sub,
