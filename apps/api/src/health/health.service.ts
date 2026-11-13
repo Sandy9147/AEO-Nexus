@@ -30,13 +30,17 @@ export class HealthService {
     let dbStatus: ServiceStatus = 'down';
     let redisStatus: ServiceStatus = 'down';
 
-    // 1. Neon PostgreSQL check (with 5-second cold-start tolerance)
+    // 1. Neon PostgreSQL check (bounded 5-second race with guaranteed timer cleanup)
+    let timeoutTimer: NodeJS.Timeout | null = null;
     try {
       await Promise.race([
         this.prisma.$queryRaw`SELECT 1`,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Neon database query timeout')), 5000),
-        ),
+        new Promise((_, reject) => {
+          timeoutTimer = setTimeout(
+            () => reject(new Error('Neon database query timed out after 5000ms')),
+            5000,
+          );
+        }),
       ]);
       dbStatus = 'up';
     } catch (err) {
@@ -44,6 +48,11 @@ export class HealthService {
         `Database health probe failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       dbStatus = 'down';
+    } finally {
+      if (timeoutTimer) {
+        clearTimeout(timeoutTimer);
+        timeoutTimer = null;
+      }
     }
 
     // 2. Redis check

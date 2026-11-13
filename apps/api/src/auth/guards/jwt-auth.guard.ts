@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
-import { AuthenticatedUser } from '@aeo-nexus/auth';
+import { AuthenticatedUser, verifyJwtHmacSha256, JwtTokenPayload } from '@aeo-nexus/auth';
 import { PlatformRole } from '@aeo-nexus/permissions';
 
 export interface RequestWithUser extends Request {
@@ -9,6 +9,16 @@ export interface RequestWithUser extends Request {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private getJwtSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret.length < 32) {
+      throw new UnauthorizedException(
+        'Server authentication configuration error: JWT_SECRET must be at least 32 characters.',
+      );
+    }
+    return secret;
+  }
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const authHeader = request.headers.authorization;
@@ -22,29 +32,21 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Bearer token missing');
     }
 
-    // In production/Phase 2 this verifies against JWT_SECRET using crypto/jose/jwt
-    // For Phase 1 foundation, decode or mock-validate structured payload
     try {
-      // Basic payload decoding for development baseline
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const decoded = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-        request.user = {
-          id: decoded.sub,
-          email: decoded.email,
-          platformRole: decoded.platformRole as PlatformRole,
-        };
-      } else {
-        // Fallback for dev testing tokens: "dev-user-id" or similar
-        request.user = {
-          id: token.startsWith('user_') ? token : 'usr_dev_foundation',
-          email: 'dev@aeonexus.internal',
-          platformRole: token.includes('superadmin') ? PlatformRole.SUPERADMIN : null,
-        };
-      }
+      const secret = this.getJwtSecret();
+      const payload = verifyJwtHmacSha256<JwtTokenPayload>(token, secret);
+
+      request.user = {
+        id: payload.sub,
+        email: payload.email,
+        platformRole: (payload.platformRole as PlatformRole) || null,
+      };
+
       return true;
-    } catch {
-      throw new UnauthorizedException('Invalid authentication token');
+    } catch (error) {
+      throw new UnauthorizedException(
+        error instanceof Error ? error.message : 'Invalid authentication token',
+      );
     }
   }
 }

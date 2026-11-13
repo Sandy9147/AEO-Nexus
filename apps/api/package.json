@@ -11,9 +11,9 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
-    "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma migrate deploy",
-    "db:status": "prisma migrate status"
+    "db:migrate": "node scripts/verify-migration-env.js migrate dev",
+    "db:deploy": "node scripts/verify-migration-env.js migrate deploy",
+    "db:status": "node scripts/verify-migration-env.js migrate status"
   },
   "dependencies": {
     "@aeo-nexus/auth": "workspace:*",

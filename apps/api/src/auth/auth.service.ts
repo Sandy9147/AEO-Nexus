@@ -1,11 +1,22 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginRequest, RegisterRequest, LoginResponse } from '@aeo-nexus/contracts';
+import { signJwtHmacSha256 } from '@aeo-nexus/auth';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private getJwtSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        'JWT_SECRET must be configured with at least 32 characters of secret material.',
+      );
+    }
+    return secret;
+  }
 
   async login(dto: LoginRequest): Promise<LoginResponse> {
     const user = await this.prisma.user.findUnique({
@@ -26,17 +37,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Mock token payload generator for foundation phase
-    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
-    const payload = Buffer.from(
-      JSON.stringify({
+    const secret = this.getJwtSecret();
+    const token = signJwtHmacSha256(
+      {
         sub: user.id,
         email: user.email,
         platformRole: user.platformRole,
         exp: Math.floor(Date.now() / 1000) + 86400,
-      }),
-    ).toString('base64url');
-    const token = `${header}.${payload}.dev_sig`;
+      },
+      secret,
+    );
 
     return {
       user: {
