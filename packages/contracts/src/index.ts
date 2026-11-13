@@ -381,3 +381,410 @@ export interface AppCatalogItemDto {
   launchUrl?: string;
 }
 
+// ==============================================================================
+// 10. Phase 4: Project & Task Management Contracts
+// ==============================================================================
+
+export const ProjectStatusEnum = z.enum([
+  'PLANNING',
+  'ACTIVE',
+  'ON_HOLD',
+  'COMPLETED',
+  'ARCHIVED',
+]);
+export type ProjectStatus = z.infer<typeof ProjectStatusEnum>;
+
+export const TaskStatusEnum = z.enum([
+  'TODO',
+  'IN_PROGRESS',
+  'IN_REVIEW',
+  'COMPLETED',
+  'BLOCKED',
+]);
+export type TaskStatus = z.infer<typeof TaskStatusEnum>;
+
+export const TaskPriorityEnum = z.enum([
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'URGENT',
+]);
+export type TaskPriority = z.infer<typeof TaskPriorityEnum>;
+
+export const CreateProjectSchema = z.object({
+  name: z.string().min(1, 'Project name is required').max(100),
+  description: z.string().max(2000).optional(),
+  status: ProjectStatusEnum.default('PLANNING').optional(),
+  startDate: z.string().datetime().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  memberIds: z.array(z.string().uuid()).optional(),
+});
+export type CreateProjectRequest = z.infer<typeof CreateProjectSchema>;
+
+export const UpdateProjectSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  status: ProjectStatusEnum.optional(),
+  progress: z.number().min(0).max(100).optional(),
+  startDate: z.string().datetime().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  memberIds: z.array(z.string().uuid()).optional(),
+});
+export type UpdateProjectRequest = z.infer<typeof UpdateProjectSchema>;
+
+export interface ProjectMemberDto {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: string;
+  joinedAt: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+}
+
+export interface ProjectDto {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description?: string | null;
+  status: ProjectStatus;
+  progress: number;
+  startDate?: string | null;
+  dueDate?: string | null;
+  ownerId: string;
+  owner: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+  membersCount: number;
+  tasksCount: number;
+  completedTasksCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectDetailDto extends ProjectDto {
+  members: ProjectMemberDto[];
+  tasks: TaskDto[];
+  commentsCount: number;
+}
+
+export const CreateTaskSchema = z.object({
+  projectId: z.string().uuid('Project ID must be a valid UUID'),
+  title: z.string().min(1, 'Task title is required').max(200),
+  description: z.string().max(5000).optional(),
+  status: TaskStatusEnum.default('TODO').optional(),
+  priority: TaskPriorityEnum.default('MEDIUM').optional(),
+  assignedToId: z.string().uuid().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+});
+export type CreateTaskRequest = z.infer<typeof CreateTaskSchema>;
+
+export const UpdateTaskSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).optional().nullable(),
+  status: TaskStatusEnum.optional(),
+  priority: TaskPriorityEnum.optional(),
+  assignedToId: z.string().uuid().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+});
+export type UpdateTaskRequest = z.infer<typeof UpdateTaskSchema>;
+
+export interface TaskDto {
+  id: string;
+  projectId: string;
+  workspaceId: string;
+  title: string;
+  description?: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignedToId?: string | null;
+  assignedTo?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  } | null;
+  createdById: string;
+  createdBy: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+  dueDate?: string | null;
+  commentsCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CreateTaskCommentSchema = z.object({
+  content: z.string().min(1, 'Comment content is required').max(3000),
+});
+export type CreateTaskCommentRequest = z.infer<typeof CreateTaskCommentSchema>;
+
+export interface TaskCommentDto {
+  id: string;
+  taskId: string;
+  authorId: string;
+  author: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CreateProjectCommentSchema = z.object({
+  content: z.string().min(1, 'Comment content is required').max(3000),
+});
+export type CreateProjectCommentRequest = z.infer<typeof CreateProjectCommentSchema>;
+
+export interface ProjectCommentDto {
+  id: string;
+  projectId: string;
+  authorId: string;
+  author: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==============================================================================
+// 11. Phase 4: Asset & Storage Contracts
+// ==============================================================================
+
+export const CreateAssetFolderSchema = z.object({
+  name: z.string().min(1, 'Folder name is required').max(100),
+  parentId: z.string().uuid().optional().nullable(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+});
+export type CreateAssetFolderRequest = z.infer<typeof CreateAssetFolderSchema>;
+
+export interface AssetFolderDto {
+  id: string;
+  workspaceId: string;
+  name: string;
+  parentId?: string | null;
+  color?: string | null;
+  subfoldersCount: number;
+  assetsCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const PresignedUploadRequestSchema = z.object({
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(100),
+  sizeBytes: z.number().int().positive().max(100 * 1024 * 1024, 'Max file size is 100MB'),
+  folderId: z.string().uuid().optional().nullable(),
+});
+export type PresignedUploadRequest = z.infer<typeof PresignedUploadRequestSchema>;
+
+export interface PresignedUploadResponseDto {
+  uploadUrl: string;
+  downloadUrl: string;
+  key: string;
+  expiresInSeconds: number;
+  method: 'PUT' | 'POST';
+}
+
+export const CreateAssetMetadataSchema = z.object({
+  name: z.string().min(1).max(255),
+  storageKey: z.string().min(1),
+  url: z.string().url(),
+  mimeType: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  folderId: z.string().uuid().optional().nullable(),
+  metadata: z.record(z.unknown()).optional(),
+});
+export type CreateAssetMetadataRequest = z.infer<typeof CreateAssetMetadataSchema>;
+
+export interface AssetDto {
+  id: string;
+  workspaceId: string;
+  folderId?: string | null;
+  folder?: {
+    id: string;
+    name: string;
+  } | null;
+  name: string;
+  storageKey: string;
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedById: string;
+  uploadedBy: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StorageConfigStatusDto {
+  isConfigured: boolean;
+  provider: 's3' | 'r2' | 'unconfigured';
+  bucket?: string;
+  region?: string;
+  warning?: string;
+}
+
+// ==============================================================================
+// 12. Phase 4: Business Knowledge Base Contracts
+// ==============================================================================
+
+export const KnowledgeCategoryEnum = z.enum([
+  'COMPANY',
+  'PRODUCTS',
+  'SERVICES',
+  'FAQS',
+  'POLICIES',
+  'BRAND',
+  'MARKETING',
+  'OPERATIONS',
+  'OTHER',
+]);
+export type KnowledgeCategory = z.infer<typeof KnowledgeCategoryEnum>;
+
+export const KnowledgeStatusEnum = z.enum([
+  'DRAFT',
+  'PUBLISHED',
+  'ARCHIVED',
+]);
+export type KnowledgeStatus = z.infer<typeof KnowledgeStatusEnum>;
+
+export const CreateKnowledgeDocumentSchema = z.object({
+  title: z.string().min(1, 'Document title is required').max(200),
+  category: KnowledgeCategoryEnum.default('COMPANY'),
+  content: z.string().min(1, 'Document content is required'),
+  status: KnowledgeStatusEnum.default('PUBLISHED').optional(),
+  tags: z.array(z.string()).default([]),
+  sourceUrl: z.string().url().optional().nullable().or(z.literal('')),
+});
+export type CreateKnowledgeDocumentRequest = z.infer<typeof CreateKnowledgeDocumentSchema>;
+
+export const UpdateKnowledgeDocumentSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  category: KnowledgeCategoryEnum.optional(),
+  content: z.string().min(1).optional(),
+  status: KnowledgeStatusEnum.optional(),
+  tags: z.array(z.string()).optional(),
+  sourceUrl: z.string().url().optional().nullable().or(z.literal('')),
+  changeNote: z.string().max(500).optional(),
+});
+export type UpdateKnowledgeDocumentRequest = z.infer<typeof UpdateKnowledgeDocumentSchema>;
+
+export interface KnowledgeDocumentVersionDto {
+  id: string;
+  documentId: string;
+  version: number;
+  title: string;
+  content: string;
+  changeNote?: string | null;
+  createdById: string;
+  createdBy: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  createdAt: string;
+}
+
+export interface KnowledgeDocumentDto {
+  id: string;
+  workspaceId: string;
+  title: string;
+  category: KnowledgeCategory;
+  contentSnippet: string;
+  status: KnowledgeStatus;
+  tags: string[];
+  sourceUrl?: string | null;
+  authorId: string;
+  author: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeDocumentDetailDto extends KnowledgeDocumentDto {
+  content: string;
+  versions: KnowledgeDocumentVersionDto[];
+}
+
+// ==============================================================================
+// 13. Phase 4: Collaboration, Notifications & Activity Contracts
+// ==============================================================================
+
+export const NotificationTypeEnum = z.enum([
+  'PROJECT_INVITE',
+  'TASK_ASSIGNED',
+  'TASK_STATUS_CHANGED',
+  'COMMENT_ADDED',
+  'ASSET_UPLOADED',
+  'DOCUMENT_PUBLISHED',
+  'SYSTEM_ALERT',
+]);
+export type NotificationType = z.infer<typeof NotificationTypeEnum>;
+
+export interface NotificationDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  resourceId?: string | null;
+  resourceType?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ActivityEventDto {
+  id: string;
+  workspaceId: string;
+  actorId: string;
+  actor: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+

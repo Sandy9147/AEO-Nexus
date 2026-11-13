@@ -15,7 +15,7 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-  { name: 'AI Business Agent', href: '/agent', icon: '🤖', badge: 'Phase 4', isComingSoon: true },
+  { name: 'AI Business Agent', href: '/agent', icon: '🤖', badge: 'Phase 5', isComingSoon: true },
   { name: 'Apps & Tools', href: '/apps', icon: '⚡' },
 ];
 
@@ -29,12 +29,12 @@ const LIFECYCLE_NAV: NavItem[] = [
 ];
 
 const WORKSPACE_NAV: NavItem[] = [
-  { name: 'Projects', href: '/projects', icon: '📁', isComingSoon: true },
-  { name: 'Assets & Knowledge', href: '/assets', icon: '📚', isComingSoon: true },
+  { name: 'Projects', href: '/projects', icon: '📁' },
+  { name: 'Assets & Knowledge', href: '/assets', icon: '📚' },
   { name: 'Team', href: '/team', icon: '👥' },
   { name: 'Integrations', href: '/integrations', icon: '🔌', isComingSoon: true },
   { name: 'Billing & Usage', href: '/billing', icon: '💳', isComingSoon: true },
-  { name: 'Notifications', href: '/notifications', icon: '🔔', isComingSoon: true },
+  { name: 'Notifications', href: '/notifications', icon: '🔔' },
   { name: 'Settings', href: '/settings', icon: '⚙️' },
 ];
 

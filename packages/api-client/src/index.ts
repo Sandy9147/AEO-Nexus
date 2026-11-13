@@ -23,6 +23,30 @@ import {
   WorkspacePreferenceDto,
   DashboardSummaryDto,
   AppCatalogItemDto,
+  ProjectDto,
+  ProjectDetailDto,
+  CreateProjectRequest,
+  UpdateProjectRequest,
+  TaskDto,
+  CreateTaskRequest,
+  UpdateTaskRequest,
+  TaskCommentDto,
+  CreateTaskCommentRequest,
+  ProjectCommentDto,
+  CreateProjectCommentRequest,
+  AssetFolderDto,
+  CreateAssetFolderRequest,
+  AssetDto,
+  CreateAssetMetadataRequest,
+  StorageConfigStatusDto,
+  PresignedUploadRequest,
+  PresignedUploadResponseDto,
+  KnowledgeDocumentDto,
+  KnowledgeDocumentDetailDto,
+  CreateKnowledgeDocumentRequest,
+  UpdateKnowledgeDocumentRequest,
+  NotificationDto,
+  ActivityEventDto,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -349,5 +373,276 @@ export class AeoNexusApiClient {
 
   async getAppBySlug(slug: string): Promise<AppCatalogItemDto> {
     return this.request<AppCatalogItemDto>(`/apps/catalog/${slug}`);
+  }
+
+  // ==============================================================================
+  // Phase 4: Projects & Tasks
+  // ==============================================================================
+
+  async getProjects(
+    workspaceId: string,
+    params?: { status?: string; search?: string },
+  ): Promise<ProjectDto[]> {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.search) qs.set('search', params.search);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<ProjectDto[]>(`/workspaces/${workspaceId}/projects${queryString}`);
+  }
+
+  async getProject(workspaceId: string, projectId: string): Promise<ProjectDetailDto> {
+    return this.request<ProjectDetailDto>(`/workspaces/${workspaceId}/projects/${projectId}`);
+  }
+
+  async createProject(
+    workspaceId: string,
+    payload: CreateProjectRequest,
+  ): Promise<ProjectDto> {
+    return this.request<ProjectDto>(`/workspaces/${workspaceId}/projects`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateProject(
+    workspaceId: string,
+    projectId: string,
+    payload: UpdateProjectRequest,
+  ): Promise<ProjectDto> {
+    return this.request<ProjectDto>(`/workspaces/${workspaceId}/projects/${projectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async archiveProject(workspaceId: string, projectId: string): Promise<ProjectDto> {
+    return this.request<ProjectDto>(`/workspaces/${workspaceId}/projects/${projectId}/archive`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteProject(workspaceId: string, projectId: string): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>(`/workspaces/${workspaceId}/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getProjectTasks(
+    workspaceId: string,
+    projectId: string,
+    params?: { status?: string },
+  ): Promise<TaskDto[]> {
+    const qs = params?.status ? `?status=${params.status}` : '';
+    return this.request<TaskDto[]>(`/workspaces/${workspaceId}/projects/${projectId}/tasks${qs}`);
+  }
+
+  async createTask(workspaceId: string, payload: CreateTaskRequest): Promise<TaskDto> {
+    return this.request<TaskDto>(`/workspaces/${workspaceId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateTask(
+    workspaceId: string,
+    taskId: string,
+    payload: UpdateTaskRequest,
+  ): Promise<TaskDto> {
+    return this.request<TaskDto>(`/workspaces/${workspaceId}/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteTask(workspaceId: string, taskId: string): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>(`/workspaces/${workspaceId}/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getTaskComments(workspaceId: string, taskId: string): Promise<TaskCommentDto[]> {
+    return this.request<TaskCommentDto[]>(`/workspaces/${workspaceId}/tasks/${taskId}/comments`);
+  }
+
+  async createTaskComment(
+    workspaceId: string,
+    taskId: string,
+    payload: CreateTaskCommentRequest,
+  ): Promise<TaskCommentDto> {
+    return this.request<TaskCommentDto>(`/workspaces/${workspaceId}/tasks/${taskId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getProjectComments(workspaceId: string, projectId: string): Promise<ProjectCommentDto[]> {
+    return this.request<ProjectCommentDto[]>(`/workspaces/${workspaceId}/projects/${projectId}/comments`);
+  }
+
+  async createProjectComment(
+    workspaceId: string,
+    projectId: string,
+    payload: CreateProjectCommentRequest,
+  ): Promise<ProjectCommentDto> {
+    return this.request<ProjectCommentDto>(`/workspaces/${workspaceId}/projects/${projectId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // ==============================================================================
+  // Phase 4: Assets & Storage
+  // ==============================================================================
+
+  async getStorageStatus(workspaceId: string): Promise<StorageConfigStatusDto> {
+    return this.request<StorageConfigStatusDto>(`/workspaces/${workspaceId}/assets/storage-status`);
+  }
+
+  async getFolders(workspaceId: string): Promise<AssetFolderDto[]> {
+    return this.request<AssetFolderDto[]>(`/workspaces/${workspaceId}/assets/folders`);
+  }
+
+  async createFolder(
+    workspaceId: string,
+    payload: CreateAssetFolderRequest,
+  ): Promise<AssetFolderDto> {
+    return this.request<AssetFolderDto>(`/workspaces/${workspaceId}/assets/folders`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteFolder(workspaceId: string, folderId: string): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>(`/workspaces/${workspaceId}/assets/folders/${folderId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getAssets(
+    workspaceId: string,
+    params?: { folderId?: string; search?: string },
+  ): Promise<AssetDto[]> {
+    const qs = new URLSearchParams();
+    if (params?.folderId) qs.set('folderId', params.folderId);
+    if (params?.search) qs.set('search', params.search);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<AssetDto[]>(`/workspaces/${workspaceId}/assets${queryString}`);
+  }
+
+  async getAsset(workspaceId: string, assetId: string): Promise<AssetDto> {
+    return this.request<AssetDto>(`/workspaces/${workspaceId}/assets/${assetId}`);
+  }
+
+  async requestPresignedUpload(
+    workspaceId: string,
+    payload: PresignedUploadRequest,
+  ): Promise<PresignedUploadResponseDto> {
+    return this.request<PresignedUploadResponseDto>(`/workspaces/${workspaceId}/assets/upload-url`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createAssetMetadata(
+    workspaceId: string,
+    payload: CreateAssetMetadataRequest,
+  ): Promise<AssetDto> {
+    return this.request<AssetDto>(`/workspaces/${workspaceId}/assets`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteAsset(workspaceId: string, assetId: string): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>(`/workspaces/${workspaceId}/assets/${assetId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ==============================================================================
+  // Phase 4: Knowledge Base
+  // ==============================================================================
+
+  async getKnowledgeDocuments(
+    workspaceId: string,
+    params?: { category?: string; status?: string; search?: string },
+  ): Promise<KnowledgeDocumentDto[]> {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set('category', params.category);
+    if (params?.status) qs.set('status', params.status);
+    if (params?.search) qs.set('search', params.search);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<KnowledgeDocumentDto[]>(`/workspaces/${workspaceId}/knowledge${queryString}`);
+  }
+
+  async getKnowledgeDocument(
+    workspaceId: string,
+    documentId: string,
+  ): Promise<KnowledgeDocumentDetailDto> {
+    return this.request<KnowledgeDocumentDetailDto>(`/workspaces/${workspaceId}/knowledge/${documentId}`);
+  }
+
+  async createKnowledgeDocument(
+    workspaceId: string,
+    payload: CreateKnowledgeDocumentRequest,
+  ): Promise<KnowledgeDocumentDto> {
+    return this.request<KnowledgeDocumentDto>(`/workspaces/${workspaceId}/knowledge`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateKnowledgeDocument(
+    workspaceId: string,
+    documentId: string,
+    payload: UpdateKnowledgeDocumentRequest,
+  ): Promise<KnowledgeDocumentDto> {
+    return this.request<KnowledgeDocumentDto>(`/workspaces/${workspaceId}/knowledge/${documentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteKnowledgeDocument(
+    workspaceId: string,
+    documentId: string,
+  ): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>(`/workspaces/${workspaceId}/knowledge/${documentId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ==============================================================================
+  // Phase 4: Notifications & Activity
+  // ==============================================================================
+
+  async getNotifications(
+    workspaceId: string,
+    unreadOnly = false,
+  ): Promise<NotificationDto[]> {
+    const qs = unreadOnly ? '?unread=true' : '';
+    return this.request<NotificationDto[]>(`/workspaces/${workspaceId}/notifications${qs}`);
+  }
+
+  async markNotificationRead(
+    workspaceId: string,
+    notificationId: string,
+  ): Promise<NotificationDto> {
+    return this.request<NotificationDto>(`/workspaces/${workspaceId}/notifications/${notificationId}/read`, {
+      method: 'POST',
+    });
+  }
+
+  async markAllNotificationsRead(workspaceId: string): Promise<{ updatedCount: number }> {
+    return this.request<{ updatedCount: number }>(`/workspaces/${workspaceId}/notifications/read-all`, {
+      method: 'POST',
+    });
+  }
+
+  async getActivityFeed(
+    workspaceId: string,
+    limit = 20,
+  ): Promise<ActivityEventDto[]> {
+    return this.request<ActivityEventDto[]>(`/workspaces/${workspaceId}/activity?limit=${limit}`);
   }
 }

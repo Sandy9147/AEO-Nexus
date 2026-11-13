@@ -6,6 +6,10 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { EmailModule } from './email/email.module';
 import { BusinessModule } from './business/business.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { ProjectsModule } from './projects/projects.module';
+import { AssetsModule } from './assets/assets.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -16,6 +20,11 @@ import { CatalogModule } from './catalog/catalog.module';
     EmailModule,
     BusinessModule,
     CatalogModule,
+    ProjectsModule,
+    AssetsModule,
+    KnowledgeModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
+
