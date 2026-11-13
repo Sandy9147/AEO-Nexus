@@ -239,3 +239,4 @@ ALTER TABLE "aeo_research_questions" ADD CONSTRAINT "aeo_research_questions_work
 ALTER TABLE "aeo_research_questions" ADD CONSTRAINT "aeo_research_questions_research_id_fkey" FOREIGN KEY ("research_id") REFERENCES "research_projects"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE "aeo_research_results" ADD CONSTRAINT "aeo_research_results_question_id_fkey" FOREIGN KEY ("question_id") REFERENCES "aeo_research_questions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

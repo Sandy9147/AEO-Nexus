@@ -21,7 +21,7 @@ const PRIMARY_NAV: NavItem[] = [
 
 const LIFECYCLE_NAV: NavItem[] = [
   { name: 'Discover', href: '/discover', icon: '🔍', badge: 'Active' },
-  { name: 'Plan', href: '/plan', icon: '📋', isComingSoon: true },
+  { name: 'Plan', href: '/plan', icon: '📋', badge: 'Active' },
   { name: 'Build', href: '/build', icon: '🛠️', isComingSoon: true },
   { name: 'Market', href: '/market', icon: '📢', isComingSoon: true },
   { name: 'Automate', href: '/automate', icon: '⚡', isComingSoon: true },

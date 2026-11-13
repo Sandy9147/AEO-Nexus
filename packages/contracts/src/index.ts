@@ -1323,4 +1323,506 @@ export const CreateAEOResearchQuestionSchema = z.object({
 });
 export type CreateAEOResearchQuestionRequest = z.infer<typeof CreateAEOResearchQuestionSchema>;
 
+// ============================================================================
+// Phase 6B: Plan — AI Business Planning & Strategic Roadmap Contracts
+// ============================================================================
+
+export type PlanStatus =
+  | 'DRAFT'
+  | 'GENERATING'
+  | 'READY_FOR_REVIEW'
+  | 'APPROVED'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'ARCHIVED';
+
+export type GoalCategory =
+  | 'REVENUE'
+  | 'CUSTOMER_ACQUISITION'
+  | 'CUSTOMER_RETENTION'
+  | 'WEBSITE_TRAFFIC'
+  | 'BRAND_AWARENESS'
+  | 'AEO_VISIBILITY'
+  | 'PRODUCT_LAUNCH'
+  | 'OPERATIONAL_EFFICIENCY';
+
+export type GoalStatus =
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'ON_TRACK'
+  | 'AT_RISK'
+  | 'BEHIND'
+  | 'ACHIEVED'
+  | 'CANCELLED';
+
+export type GoalPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type InitiativePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type InitiativeStatus =
+  | 'PROPOSED'
+  | 'PLANNED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'ON_HOLD'
+  | 'CANCELLED';
+
+export type ReviewPeriod = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY';
+export type ReviewStatus = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETED';
+
+// ---------------------------------------------------------------------------
+// Strategic Plan Schemas & DTOs
+// ---------------------------------------------------------------------------
+
+export const CreateStrategicPlanSchema = z.object({
+  title: z.string().min(2).max(200),
+  planType: z.string().default('BUSINESS_LAUNCH'),
+  businessStage: z.string().optional(),
+  targetMarket: z.string().optional(),
+  targetAudience: z.string().optional(),
+  horizonMonths: z.number().int().min(1).max(60).default(12),
+  budgetRange: z.string().optional(),
+  teamSize: z.string().optional(),
+  researchId: z.string().uuid().optional(),
+  opportunityId: z.string().uuid().optional(),
+  executiveSummary: z.string().optional(),
+  currentSituation: z.string().optional(),
+  marketPositioning: z.string().optional(),
+  strategicObjectives: z.array(z.string()).default([]),
+  requiredResources: z.array(z.string()).default([]),
+  budgetAssumptions: z.array(z.string()).default([]),
+  risksAndMitigations: z.any().optional(),
+  dependencies: z.array(z.string()).default([]),
+  timelineAssumptions: z.array(z.string()).default([]),
+  successMetrics: z.array(z.string()).default([]),
+  validationRequirements: z.array(z.string()).default([]),
+  nextRecommendedActions: z.array(z.string()).default([]),
+  confidenceScore: z.number().min(0).max(1).default(0.85).optional(),
+});
+export type CreateStrategicPlanRequest = z.infer<typeof CreateStrategicPlanSchema>;
+
+export const GenerateStrategicPlanSchema = z.object({
+  title: z.string().min(2).max(200),
+  planType: z.string().default('BUSINESS_LAUNCH'),
+  businessStage: z.string().optional(),
+  targetMarket: z.string().optional(),
+  targetCountry: z.string().optional(),
+  targetAudience: z.string().optional(),
+  desiredOutcomes: z.string().optional(),
+  budgetRange: z.string().optional(),
+  timeline: z.string().optional(),
+  teamSize: z.string().optional(),
+  researchId: z.string().uuid().optional(),
+  opportunityId: z.string().uuid().optional(),
+  additionalInstructions: z.string().max(2000).optional(),
+});
+export type GenerateStrategicPlanRequest = z.infer<typeof GenerateStrategicPlanSchema>;
+
+export const UpdateStrategicPlanSchema = CreateStrategicPlanSchema.partial().extend({
+  status: z.enum([
+    'DRAFT',
+    'GENERATING',
+    'READY_FOR_REVIEW',
+    'APPROVED',
+    'ACTIVE',
+    'COMPLETED',
+    'ARCHIVED',
+  ]).optional(),
+});
+export type UpdateStrategicPlanRequest = z.infer<typeof UpdateStrategicPlanSchema>;
+
+export interface StrategicPlanDto {
+  id: string;
+  workspaceId: string;
+  createdById: string;
+  title: string;
+  planType: string;
+  businessStage: string | null;
+  targetMarket: string | null;
+  targetAudience: string | null;
+  horizonMonths: number;
+  budgetRange: string | null;
+  teamSize: string | null;
+  status: PlanStatus;
+  executiveSummary: string | null;
+  currentSituation: string | null;
+  marketPositioning: string | null;
+  strategicObjectives: string[];
+  requiredResources: string[];
+  budgetAssumptions: string[];
+  risksAndMitigations: any | null;
+  dependencies: string[];
+  timelineAssumptions: string[];
+  successMetrics: string[];
+  validationRequirements: string[];
+  nextRecommendedActions: string[];
+  confidenceScore: number;
+  researchId: string | null;
+  opportunityId: string | null;
+  currentVersionNumber: number;
+  goalsCount?: number;
+  initiativesCount?: number;
+  roadmapsCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StrategicPlanVersionDto {
+  id: string;
+  planId: string;
+  versionNumber: number;
+  title: string;
+  content: any;
+  changeSummary: string | null;
+  createdById: string;
+  createdAt: string;
+}
+
+export interface StrategicPlanDetailDto extends StrategicPlanDto {
+  versions: StrategicPlanVersionDto[];
+  goals: BusinessGoalDto[];
+  initiatives: StrategicInitiativeDto[];
+  roadmaps: StrategicRoadmapDto[];
+  reviews: StrategyReviewDto[];
+  recommendations: PlanningRecommendationDto[];
+}
+
+// ---------------------------------------------------------------------------
+// Business Goal Schemas & DTOs
+// ---------------------------------------------------------------------------
+
+export const CreateBusinessGoalSchema = z.object({
+  planId: z.string().uuid().optional(),
+  title: z.string().min(2).max(200),
+  description: z.string().max(2000).optional(),
+  category: z.enum([
+    'REVENUE',
+    'CUSTOMER_ACQUISITION',
+    'CUSTOMER_RETENTION',
+    'WEBSITE_TRAFFIC',
+    'BRAND_AWARENESS',
+    'AEO_VISIBILITY',
+    'PRODUCT_LAUNCH',
+    'OPERATIONAL_EFFICIENCY',
+  ]).default('REVENUE'),
+  targetValue: z.number(),
+  currentValue: z.number().default(0),
+  unit: z.string().default('USD'),
+  startDate: z.string().optional(),
+  targetDate: z.string().optional(),
+  status: z.enum([
+    'NOT_STARTED',
+    'IN_PROGRESS',
+    'ON_TRACK',
+    'AT_RISK',
+    'BEHIND',
+    'ACHIEVED',
+    'CANCELLED',
+  ]).default('NOT_STARTED'),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('MEDIUM'),
+  measurementFrequency: z.string().default('MONTHLY'),
+  isQualitative: z.boolean().default(false),
+  assignedOwnerId: z.string().uuid().optional(),
+});
+export type CreateBusinessGoalRequest = z.infer<typeof CreateBusinessGoalSchema>;
+
+export const UpdateBusinessGoalSchema = CreateBusinessGoalSchema.partial();
+export type UpdateBusinessGoalRequest = z.infer<typeof UpdateBusinessGoalSchema>;
+
+export const RecordGoalProgressSchema = z.object({
+  newValue: z.number(),
+  note: z.string().max(1000).optional(),
+  isExternalMeasurement: z.boolean().default(false),
+});
+export type RecordGoalProgressRequest = z.infer<typeof RecordGoalProgressSchema>;
+
+export interface GoalProgressRecordDto {
+  id: string;
+  goalId: string;
+  recordedById: string;
+  previousValue: number;
+  newValue: number;
+  note: string | null;
+  isExternalMeasurement: boolean;
+  recordedAt: string;
+}
+
+export interface BusinessGoalDto {
+  id: string;
+  workspaceId: string;
+  planId: string | null;
+  title: string;
+  description: string | null;
+  category: GoalCategory;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  progressPercent: number;
+  startDate: string | null;
+  targetDate: string | null;
+  status: GoalStatus;
+  priority: GoalPriority;
+  measurementFrequency: string;
+  isQualitative: boolean;
+  assignedOwnerId: string | null;
+  progressRecords?: GoalProgressRecordDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Strategic Initiative Schemas & DTOs
+// ---------------------------------------------------------------------------
+
+export const CreateStrategicInitiativeSchema = z.object({
+  planId: z.string().uuid().optional(),
+  goalId: z.string().uuid().optional(),
+  opportunityId: z.string().uuid().optional(),
+  roadmapPhaseId: z.string().uuid().optional(),
+  name: z.string().min(2).max(200),
+  description: z.string().max(3000).optional(),
+  strategicRationale: z.string().max(2000).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).default('MEDIUM'),
+  status: z.enum([
+    'PROPOSED',
+    'PLANNED',
+    'IN_PROGRESS',
+    'COMPLETED',
+    'ON_HOLD',
+    'CANCELLED',
+  ]).default('PLANNED'),
+  expectedImpact: z.string().default('HIGH'),
+  estimatedEffort: z.string().default('MEDIUM'),
+  estimatedCost: z.string().optional(),
+  risks: z.array(z.string()).default([]),
+  recommendedActions: z.array(z.string()).default([]),
+  evidenceReferences: z.any().optional(),
+  evidenceType: z.enum([
+    'VERIFIED_SOURCE',
+    'AI_ANALYSIS',
+    'USER_INPUT',
+    'UNVERIFIED_ASSUMPTION',
+  ]).default('AI_ANALYSIS'),
+  ownerId: z.string().uuid().optional(),
+});
+export type CreateStrategicInitiativeRequest = z.infer<typeof CreateStrategicInitiativeSchema>;
+
+export const UpdateStrategicInitiativeSchema = CreateStrategicInitiativeSchema.partial();
+export type UpdateStrategicInitiativeRequest = z.infer<typeof UpdateStrategicInitiativeSchema>;
+
+export const ConvertInitiativeToProjectSchema = z.object({
+  projectName: z.string().min(2).max(200).optional(),
+  projectDescription: z.string().max(2000).optional(),
+  createInitialTasks: z.boolean().default(true),
+});
+export type ConvertInitiativeToProjectRequest = z.infer<typeof ConvertInitiativeToProjectSchema>;
+
+export interface StrategicInitiativeDto {
+  id: string;
+  workspaceId: string;
+  planId: string | null;
+  goalId: string | null;
+  opportunityId: string | null;
+  roadmapPhaseId: string | null;
+  name: string;
+  description: string | null;
+  strategicRationale: string | null;
+  priority: InitiativePriority;
+  status: InitiativeStatus;
+  expectedImpact: string;
+  estimatedEffort: string;
+  estimatedCost: string | null;
+  risks: string[];
+  recommendedActions: string[];
+  evidenceReferences: any | null;
+  evidenceType: EvidenceType;
+  ownerId: string | null;
+  projectId: string | null;
+  convertedAt: string | null;
+  dependencies?: InitiativeDependencyDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Initiative Dependencies
+// ---------------------------------------------------------------------------
+
+export const CreateInitiativeDependencySchema = z.object({
+  dependsOnId: z.string().uuid(),
+  dependencyType: z.string().default('BLOCKS'),
+});
+export type CreateInitiativeDependencyRequest = z.infer<typeof CreateInitiativeDependencySchema>;
+
+export interface InitiativeDependencyDto {
+  id: string;
+  initiativeId: string;
+  dependsOnId: string;
+  dependencyType: string;
+  dependsOnInitiative?: {
+    id: string;
+    name: string;
+    status: string;
+    priority: string;
+  };
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Strategic Roadmap, Phases & Milestones
+// ---------------------------------------------------------------------------
+
+export const CreateStrategicRoadmapSchema = z.object({
+  planId: z.string().uuid().optional(),
+  title: z.string().min(2).max(200),
+  description: z.string().max(2000).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+export type CreateStrategicRoadmapRequest = z.infer<typeof CreateStrategicRoadmapSchema>;
+
+export const UpdateStrategicRoadmapSchema = CreateStrategicRoadmapSchema.partial();
+export type UpdateStrategicRoadmapRequest = z.infer<typeof UpdateStrategicRoadmapSchema>;
+
+export const CreateRoadmapPhaseSchema = z.object({
+  name: z.string().min(2).max(200),
+  description: z.string().max(2000).optional(),
+  phaseOrder: z.number().int().min(1).default(1),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  status: z.string().default('NOT_STARTED'),
+});
+export type CreateRoadmapPhaseRequest = z.infer<typeof CreateRoadmapPhaseSchema>;
+
+export interface RoadmapPhaseDto {
+  id: string;
+  roadmapId: string;
+  name: string;
+  description: string | null;
+  phaseOrder: number;
+  startDate: string | null;
+  endDate: string | null;
+  status: string;
+  initiatives?: StrategicInitiativeDto[];
+  milestones?: RoadmapMilestoneDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CreateRoadmapMilestoneSchema = z.object({
+  roadmapId: z.string().uuid(),
+  phaseId: z.string().uuid().optional(),
+  title: z.string().min(2).max(200),
+  description: z.string().max(2000).optional(),
+  targetDate: z.string(),
+  status: z.string().default('PENDING'),
+  successCriteria: z.string().max(2000).optional(),
+});
+export type CreateRoadmapMilestoneRequest = z.infer<typeof CreateRoadmapMilestoneSchema>;
+
+export const UpdateRoadmapMilestoneSchema = CreateRoadmapMilestoneSchema.partial();
+export type UpdateRoadmapMilestoneRequest = z.infer<typeof UpdateRoadmapMilestoneSchema>;
+
+export interface RoadmapMilestoneDto {
+  id: string;
+  workspaceId: string;
+  roadmapId: string;
+  phaseId: string | null;
+  title: string;
+  description: string | null;
+  targetDate: string;
+  status: string;
+  successCriteria: string | null;
+  isOverdue: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StrategicRoadmapDto {
+  id: string;
+  workspaceId: string;
+  planId: string | null;
+  title: string;
+  description: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  phases: RoadmapPhaseDto[];
+  milestones: RoadmapMilestoneDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Strategy Reviews
+// ---------------------------------------------------------------------------
+
+export const CreateStrategyReviewSchema = z.object({
+  planId: z.string().uuid(),
+  period: z.enum(['WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY']).default('MONTHLY'),
+  status: z.enum(['DRAFT', 'IN_PROGRESS', 'COMPLETED']).default('COMPLETED'),
+  summary: z.string().min(5).max(4000),
+  goalsReviewed: z.any().optional(),
+  initiativesReviewed: z.any().optional(),
+  blockersIdentified: z.array(z.string()).default([]),
+  changedAssumptions: z.array(z.string()).default([]),
+  aiRecommendations: z.array(z.string()).default([]),
+  strategicAdjustments: z.array(z.string()).default([]),
+  reviewDate: z.string().optional(),
+});
+export type CreateStrategyReviewRequest = z.infer<typeof CreateStrategyReviewSchema>;
+
+export interface StrategyReviewDto {
+  id: string;
+  workspaceId: string;
+  planId: string;
+  conductedById: string;
+  period: ReviewPeriod;
+  status: ReviewStatus;
+  summary: string;
+  goalsReviewed: any | null;
+  initiativesReviewed: any | null;
+  blockersIdentified: string[];
+  changedAssumptions: string[];
+  aiRecommendations: string[];
+  strategicAdjustments: string[];
+  reviewDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Planning Recommendations & Dashboard Overview
+// ---------------------------------------------------------------------------
+
+export interface PlanningRecommendationDto {
+  id: string;
+  workspaceId: string;
+  planId: string | null;
+  title: string;
+  recommendation: string;
+  category: string;
+  impact: string;
+  urgency: string;
+  evidenceType: EvidenceType;
+  isActioned: boolean;
+  actionedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlanningOverviewDto {
+  totalPlans: number;
+  activePlans: number;
+  totalGoals: number;
+  achievedGoals: number;
+  totalInitiatives: number;
+  highPriorityInitiatives: number;
+  upcomingMilestonesCount: number;
+  overdueMilestonesCount: number;
+  activePlansList: StrategicPlanDto[];
+  goals: BusinessGoalDto[];
+  initiatives: StrategicInitiativeDto[];
+  upcomingMilestones: RoadmapMilestoneDto[];
+  overdueMilestones: RoadmapMilestoneDto[];
+  recommendations: PlanningRecommendationDto[];
+  recentReviews: StrategyReviewDto[];
+}
+
 

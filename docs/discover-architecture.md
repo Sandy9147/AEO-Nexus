@@ -107,3 +107,4 @@ sequenceDiagram
 1. **Strict Multi-Tenant Isolation**: Every database read, mutation, and aggregation is filtered by `workspaceId`. A tenant querying foreign research projects receives an immediate `404 Not Found` or `403 Forbidden`.
 2. **Hard Monthly Token & Cost Caps**: Before initiating research synthesis, `AiUsageService.checkBudgetOrThrow(workspaceId)` verifies that the workspace has not exceeded its monthly token or dollar budget. If exceeded, the run is blocked immediately.
 3. **Interactive Transaction Safety**: Neon hosted serverless PostgreSQL connections over WAN enforce connection limits. The orchestrator bounds interactive transactions with `maxWait: 15000` and `timeout: 30000`, running queries sequentially to avoid exhausting compute pools.
+

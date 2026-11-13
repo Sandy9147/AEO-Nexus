@@ -34,7 +34,7 @@ function loadEnvFile(filePath) {
 }
 
 // Load root .env then apps/api/.env
-loadEnvFile(path.resolve(__dirname, '../../../.env'));
+loadEnvFile(path.resolve(__dirname, '../../.env'));
 loadEnvFile(path.resolve(__dirname, '../.env'));
 
 const nodeEnv = process.env.NODE_ENV || 'development';

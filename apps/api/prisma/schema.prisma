@@ -126,6 +126,12 @@ model User {
   aiReviewedApprovals     AIApproval[]               @relation("ApprovalReviewer")
   aiUsageRecords          AIUsageRecord[]
   createdResearchProjects ResearchProject[]
+  createdStrategicPlans     StrategicPlan[]           @relation("PlanCreator")
+  createdPlanVersions       StrategicPlanVersion[]    @relation("PlanVersionCreator")
+  assignedGoals             BusinessGoal[]            @relation("GoalOwner")
+  recordedGoalProgress      GoalProgressRecord[]      @relation("GoalProgressRecorder")
+  ownedInitiatives          StrategicInitiative[]     @relation("InitiativeOwner")
+  conductedStrategyReviews  StrategyReview[]          @relation("ReviewConductor")
 
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
@@ -214,6 +220,13 @@ model Workspace {
   audienceProfiles   AudienceProfile[]
   marketOpportunities MarketOpportunity[]
   aeoResearchQuestions AEOResearchQuestion[]
+  strategicPlans        StrategicPlan[]
+  businessGoals         BusinessGoal[]
+  strategicInitiatives  StrategicInitiative[]
+  strategicRoadmaps     StrategicRoadmap[]
+  roadmapMilestones     RoadmapMilestone[]
+  strategyReviews       StrategyReview[]
+  planningRecommendations PlanningRecommendation[]
 
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -369,6 +382,7 @@ model Project {
   members     ProjectMember[]
   tasks       Task[]
   comments    ProjectComment[]
+  strategicInitiative StrategicInitiative?
 
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -838,6 +852,7 @@ model ResearchProject {
   competitors         Competitor[]
   audienceProfiles    AudienceProfile[]
   aeoQuestions        AEOResearchQuestion[]
+  strategicPlans      StrategicPlan[]
 
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
@@ -988,6 +1003,8 @@ model MarketOpportunity {
 
   workspace              Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   research               ResearchProject? @relation(fields: [researchId], references: [id], onDelete: SetNull)
+  strategicPlans         StrategicPlan[]
+  strategicInitiatives   StrategicInitiative[]
 
   createdAt              DateTime        @default(now()) @map("created_at")
   updatedAt              DateTime        @updatedAt @map("updated_at")
@@ -1040,4 +1057,386 @@ model AEOResearchResult {
 
   @@index([questionId])
   @@map("aeo_research_results")
+}
+
+// ============================================================================
+// Phase 6B: Plan — AI Business Planning & Strategic Roadmap Models
+// ============================================================================
+
+enum PlanStatus {
+  DRAFT
+  GENERATING
+  READY_FOR_REVIEW
+  APPROVED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum GoalCategory {
+  REVENUE
+  CUSTOMER_ACQUISITION
+  CUSTOMER_RETENTION
+  WEBSITE_TRAFFIC
+  BRAND_AWARENESS
+  AEO_VISIBILITY
+  PRODUCT_LAUNCH
+  OPERATIONAL_EFFICIENCY
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  ON_TRACK
+  AT_RISK
+  BEHIND
+  ACHIEVED
+  CANCELLED
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InitiativePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InitiativeStatus {
+  PROPOSED
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum ReviewPeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum ReviewStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+}
+
+model StrategicPlan {
+  id                     String                   @id @default(uuid())
+  workspaceId            String                   @map("workspace_id")
+  createdById            String                   @map("created_by_id")
+  title                  String
+  planType               String                   @default("BUSINESS_LAUNCH") @map("plan_type")
+  businessStage          String?                  @map("business_stage")
+  targetMarket           String?                  @map("target_market")
+  targetAudience         String?                  @map("target_audience")
+  horizonMonths          Int                      @default(12) @map("horizon_months")
+  budgetRange            String?                  @map("budget_range")
+  teamSize               String?                  @map("team_size")
+  status                 PlanStatus               @default(DRAFT)
+  executiveSummary       String?                  @map("executive_summary")
+  currentSituation       String?                  @map("current_situation")
+  marketPositioning      String?                  @map("market_positioning")
+  strategicObjectives    String[]                 @default([]) @map("strategic_objectives")
+  requiredResources      String[]                 @default([]) @map("required_resources")
+  budgetAssumptions      String[]                 @default([]) @map("budget_assumptions")
+  risksAndMitigations    Json?                    @map("risks_and_mitigations")
+  dependencies           String[]                 @default([])
+  timelineAssumptions    String[]                 @default([]) @map("timeline_assumptions")
+  successMetrics         String[]                 @default([]) @map("success_metrics")
+  validationRequirements String[]                 @default([]) @map("validation_requirements")
+  nextRecommendedActions String[]                 @default([]) @map("next_recommended_actions")
+  confidenceScore        Float                    @default(0.85) @map("confidence_score")
+  researchId             String?                  @map("research_id")
+  opportunityId          String?                  @map("opportunity_id")
+  currentVersionNumber   Int                      @default(1) @map("current_version_number")
+
+  workspace              Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy              User                     @relation("PlanCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  research               ResearchProject?         @relation(fields: [researchId], references: [id], onDelete: SetNull)
+  opportunity            MarketOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  versions               StrategicPlanVersion[]
+  goals                  BusinessGoal[]
+  initiatives            StrategicInitiative[]
+  roadmaps               StrategicRoadmap[]
+  reviews                StrategyReview[]
+  recommendations        PlanningRecommendation[]
+
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([createdById])
+  @@index([status])
+  @@index([researchId])
+  @@index([opportunityId])
+  @@map("strategic_plans")
+}
+
+model StrategicPlanVersion {
+  id            String        @id @default(uuid())
+  planId        String        @map("plan_id")
+  versionNumber Int           @map("version_number")
+  title         String
+  content       Json
+  changeSummary String?       @map("change_summary")
+  createdById   String        @map("created_by_id")
+
+  plan          StrategicPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  createdBy     User          @relation("PlanVersionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@unique([planId, versionNumber])
+  @@index([planId])
+  @@index([createdById])
+  @@map("strategic_plan_versions")
+}
+
+model BusinessGoal {
+  id                   String               @id @default(uuid())
+  workspaceId          String               @map("workspace_id")
+  planId               String?              @map("plan_id")
+  title                String
+  description          String?
+  category             GoalCategory         @default(REVENUE)
+  targetValue          Float                @map("target_value")
+  currentValue         Float                @default(0) @map("current_value")
+  unit                 String               @default("USD")
+  startDate            DateTime?            @map("start_date")
+  targetDate           DateTime?            @map("target_date")
+  status               GoalStatus           @default(NOT_STARTED)
+  priority             GoalPriority         @default(MEDIUM)
+  measurementFrequency String               @default("MONTHLY") @map("measurement_frequency")
+  isQualitative        Boolean              @default(false) @map("is_qualitative")
+  assignedOwnerId      String?              @map("assigned_owner_id")
+
+  workspace            Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan                 StrategicPlan?       @relation(fields: [planId], references: [id], onDelete: SetNull)
+  assignedOwner        User?                @relation("GoalOwner", fields: [assignedOwnerId], references: [id], onDelete: SetNull)
+
+  progressRecords      GoalProgressRecord[]
+  initiatives          StrategicInitiative[]
+
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([planId])
+  @@index([category])
+  @@index([status])
+  @@map("business_goals")
+}
+
+model GoalProgressRecord {
+  id                    String       @id @default(uuid())
+  goalId                String       @map("goal_id")
+  recordedById          String       @map("recorded_by_id")
+  previousValue         Float        @map("previous_value")
+  newValue              Float        @map("new_value")
+  note                  String?
+  isExternalMeasurement Boolean      @default(false) @map("is_external_measurement")
+  recordedAt            DateTime     @default(now()) @map("recorded_at")
+
+  goal                  BusinessGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  recordedBy            User         @relation("GoalProgressRecorder", fields: [recordedById], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([recordedById])
+  @@map("goal_progress_records")
+}
+
+model StrategicInitiative {
+  id                 String                  @id @default(uuid())
+  workspaceId        String                  @map("workspace_id")
+  planId             String?                 @map("plan_id")
+  goalId             String?                 @map("goal_id")
+  opportunityId      String?                 @map("opportunity_id")
+  roadmapPhaseId     String?                 @map("roadmap_phase_id")
+  name               String
+  description        String?
+  strategicRationale String?                 @map("strategic_rationale")
+  priority           InitiativePriority      @default(MEDIUM)
+  status             InitiativeStatus        @default(PLANNED)
+  expectedImpact     String                  @default("HIGH") @map("expected_impact")
+  estimatedEffort    String                  @default("MEDIUM") @map("estimated_effort")
+  estimatedCost      String?                 @map("estimated_cost")
+  risks              String[]                @default([])
+  recommendedActions String[]                @default([]) @map("recommended_actions")
+  evidenceReferences Json?                   @map("evidence_references")
+  evidenceType       EvidenceType            @default(AI_ANALYSIS) @map("evidence_type")
+  ownerId            String?                 @map("owner_id")
+  projectId          String?                 @unique @map("project_id")
+  convertedAt        DateTime?               @map("converted_at")
+
+  workspace          Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan               StrategicPlan?          @relation(fields: [planId], references: [id], onDelete: SetNull)
+  goal               BusinessGoal?           @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  opportunity        MarketOpportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  roadmapPhase       RoadmapPhase?           @relation(fields: [roadmapPhaseId], references: [id], onDelete: SetNull)
+  owner              User?                   @relation("InitiativeOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  project            Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  outgoingDependencies InitiativeDependency[] @relation("InitiativeOutgoing")
+  incomingDependencies InitiativeDependency[] @relation("InitiativeIncoming")
+
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([planId])
+  @@index([goalId])
+  @@index([opportunityId])
+  @@index([status])
+  @@map("strategic_initiatives")
+}
+
+model InitiativeDependency {
+  id             String              @id @default(uuid())
+  initiativeId   String              @map("initiative_id")
+  dependsOnId    String              @map("depends_on_id")
+  dependencyType String              @default("BLOCKS") @map("dependency_type")
+
+  initiative     StrategicInitiative @relation("InitiativeOutgoing", fields: [initiativeId], references: [id], onDelete: Cascade)
+  dependsOn      StrategicInitiative @relation("InitiativeIncoming", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@unique([initiativeId, dependsOnId])
+  @@index([initiativeId])
+  @@index([dependsOnId])
+  @@map("initiative_dependencies")
+}
+
+model StrategicRoadmap {
+  id          String             @id @default(uuid())
+  workspaceId String             @map("workspace_id")
+  planId      String?            @map("plan_id")
+  title       String
+  description String?
+  startDate   DateTime?          @map("start_date")
+  endDate     DateTime?          @map("end_date")
+
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan        StrategicPlan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  phases      RoadmapPhase[]
+  milestones  RoadmapMilestone[]
+
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([planId])
+  @@map("strategic_roadmaps")
+}
+
+model RoadmapPhase {
+  id          String                @id @default(uuid())
+  roadmapId   String                @map("roadmap_id")
+  name        String
+  description String?
+  phaseOrder  Int                   @default(1) @map("phase_order")
+  startDate   DateTime?             @map("start_date")
+  endDate     DateTime?             @map("end_date")
+  status      String                @default("NOT_STARTED")
+
+  roadmap     StrategicRoadmap      @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  initiatives StrategicInitiative[]
+  milestones  RoadmapMilestone[]
+
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  @@index([roadmapId])
+  @@map("roadmap_phases")
+}
+
+model RoadmapMilestone {
+  id              String           @id @default(uuid())
+  workspaceId     String           @map("workspace_id")
+  roadmapId       String           @map("roadmap_id")
+  phaseId         String?          @map("phase_id")
+  title           String
+  description     String?
+  targetDate      DateTime         @map("target_date")
+  status          String           @default("PENDING")
+  successCriteria String?          @map("success_criteria")
+  isOverdue       Boolean          @default(false) @map("is_overdue")
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  roadmap         StrategicRoadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  phase           RoadmapPhase?    @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([roadmapId])
+  @@index([phaseId])
+  @@index([status])
+  @@map("roadmap_milestones")
+}
+
+model StrategyReview {
+  id                   String        @id @default(uuid())
+  workspaceId          String        @map("workspace_id")
+  planId               String        @map("plan_id")
+  conductedById        String        @map("conducted_by_id")
+  period               ReviewPeriod  @default(MONTHLY)
+  status               ReviewStatus  @default(COMPLETED)
+  summary              String
+  goalsReviewed        Json?         @map("goals_reviewed")
+  initiativesReviewed  Json?         @map("initiatives_reviewed")
+  blockersIdentified   String[]      @default([]) @map("blockers_identified")
+  changedAssumptions   String[]      @default([]) @map("changed_assumptions")
+  aiRecommendations    String[]      @default([]) @map("ai_recommendations")
+  strategicAdjustments String[]      @default([]) @map("strategic_adjustments")
+  reviewDate           DateTime      @default(now()) @map("review_date")
+
+  workspace            Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan                 StrategicPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  conductedBy          User          @relation("ReviewConductor", fields: [conductedById], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([planId])
+  @@index([conductedById])
+  @@map("strategy_reviews")
+}
+
+model PlanningRecommendation {
+  id             String         @id @default(uuid())
+  workspaceId    String         @map("workspace_id")
+  planId         String?        @map("plan_id")
+  title          String
+  recommendation String
+  category       String         @default("STRATEGY")
+  impact         String         @default("HIGH")
+  urgency        String         @default("IMMEDIATE")
+  evidenceType   EvidenceType   @default(AI_ANALYSIS) @map("evidence_type")
+  isActioned     Boolean        @default(false) @map("is_actioned")
+  actionedAt     DateTime?      @map("actioned_at")
+
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  plan           StrategicPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@index([planId])
+  @@index([isActioned])
+  @@map("planning_recommendations")
 }

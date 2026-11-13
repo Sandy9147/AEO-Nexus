@@ -86,7 +86,236 @@ export class MockAiProvider implements IAiProviderAdapter {
 
     let responseContent: string;
 
-    if (request.systemPrompt?.includes('DISCOVER_RESEARCH') || lower.includes('research topic:') || lower.includes('research') && lower.includes('objective')) {
+    if (
+      request.systemPrompt?.includes('STRATEGIC_PLAN') ||
+      request.systemPrompt?.includes('PLAN_GENERATION') ||
+      request.systemPrompt?.includes('Strategic Business Plan') ||
+      lower.includes('plan generation') ||
+      lower.includes('strategic plan') ||
+      lower.includes('strategic_plan') ||
+      lower.includes('generate a strategic plan')
+    ) {
+      const planData = {
+        executiveSummary: `Strategic market expansion and Answer Engine Optimization growth plan for the workspace. This plan outlines a phased path to capture category dominance across conversational search and AI answer engines, while establishing sustainable customer acquisition channels.`,
+        currentSituation: `The organization possesses a strong foundational product architecture and indexed knowledge base, but currently lacks automated answer engine visibility diagnostics and structured multi-channel distribution.`,
+        marketPositioning: `Category-defining Answer Engine Optimization and Autonomous Business Platform for mid-market SaaS and high-velocity digital agencies.`,
+        strategicObjectives: [
+          'Achieve >35% share of AI citations across target product keywords within 6 months.',
+          'Scale monthly recurring revenue by 150% through high-intent generative inbound search.',
+          'Deploy automated knowledge vault synchronization to eliminate multi-channel messaging drift.'
+        ],
+        targetAudience: `Founders, Chief Marketing Officers, and Growth Leaders at B2B SaaS organizations and modern marketing agencies seeking to capitalize on AI-first discovery.`,
+        requiredResources: [
+          'Engineering team dedicated to AEO diagnostic crawler infrastructure.',
+          'Content strategist for structured entity relationship mapping.',
+          'Cloud infrastructure allocation for continuous multi-model citation benchmarking.'
+        ],
+        budgetAssumptions: [
+          '$15,000 for AI search API integration & multi-model evaluation compute.',
+          '$8,000 for pilot customer validation cohorts and incentive programs.',
+          '$5,000 for brand asset harmonization and PR outreach.'
+        ],
+        risksAndMitigations: [
+          {
+            risk: 'Rapid algorithm updates from generative search providers (Perplexity, ChatGPT, Gemini).',
+            mitigation: 'Implement provider-agnostic citation probing with automated prompt drift alerts.',
+            severity: 'HIGH',
+            likelihood: 'HIGH'
+          },
+          {
+            risk: 'Customer hesitation around adopting new AEO visibility metrics vs traditional SEO.',
+            mitigation: 'Provide side-by-side SERP vs Generative Citation parity dashboards with verifiable ROI.',
+            severity: 'MEDIUM',
+            likelihood: 'MEDIUM'
+          }
+        ],
+        dependencies: [
+          'Completion of Phase 4 Knowledge Base entity extraction pipeline.',
+          'Verification of customer domain ownership for automated schema injection.'
+        ],
+        timelineAssumptions: [
+          'Phase 1 foundation requires 4 weeks of technical indexing and benchmark baseline.',
+          'Phase 2 active outreach and pilot deployment requires 6 weeks.',
+          'Phase 3 broad market launch and partner integration targets Q3.'
+        ],
+        successMetrics: [
+          'Citation Share: Increase from 0% baseline to 35% in targeted AI prompts.',
+          'Qualified Inbound Leads: 120+ verified demo requests originating from AI answers.',
+          'Knowledge Accuracy Score: 99.5% fidelity across automated answers.'
+        ],
+        validationRequirements: [
+          'Run controlled 30-day citation benchmark against 10 primary competitors.',
+          'Validate customer Willingness-To-Pay through 20 structured interviews.',
+          'Demonstrate zero latency degradation in knowledge retrieval endpoints.'
+        ],
+        nextRecommendedActions: [
+          'Approve the Phase 1 Foundation Initiative and convert into active engineering sprint.',
+          'Establish weekly citation review cadence with marketing and product owners.',
+          'Connect Discover research findings directly to roadmap milestones.'
+        ],
+        confidenceScore: 0.92,
+        goals: [
+          {
+            title: 'Achieve 35% Answer Engine Citation Share',
+            description: 'Secure verified brand citations across Perplexity, ChatGPT Search, and Google AI Overviews for top 50 industry queries.',
+            category: 'AEO_VISIBILITY',
+            targetValue: 35,
+            currentValue: 5,
+            unit: '%',
+            priority: 'CRITICAL',
+            measurementFrequency: 'WEEKLY',
+            isQualitative: false
+          },
+          {
+            title: 'Generate $250k Annualized Pipeline from AI Search',
+            description: 'Direct attribution of qualified inbound pipeline from conversational answer recommendations.',
+            category: 'REVENUE',
+            targetValue: 250000,
+            currentValue: 15000,
+            unit: 'USD',
+            priority: 'HIGH',
+            measurementFrequency: 'MONTHLY',
+            isQualitative: false
+          },
+          {
+            title: 'Publish Harmonized Brand Knowledge Vault',
+            description: 'Achieve complete internal alignment across product features, brand positioning, and pricing documentation.',
+            category: 'OPERATIONAL_EFFICIENCY',
+            targetValue: 100,
+            currentValue: 40,
+            unit: '%',
+            priority: 'HIGH',
+            measurementFrequency: 'BI_WEEKLY',
+            isQualitative: true
+          }
+        ],
+        initiatives: [
+          {
+            name: 'AEO Citation Diagnostic Crawler & Entity Injector',
+            description: 'Develop automated crawler to run synthetic prompt evaluations and inject structured JSON-LD entity schema.',
+            strategicRationale: 'Directly addresses the emerging shift from keyword search to conversational AI answers.',
+            priority: 'CRITICAL',
+            expectedImpact: 'HIGH',
+            estimatedEffort: 'HIGH',
+            estimatedCost: '$12,000',
+            risks: ['Frequent API structure changes by LLM providers', 'Crawler rate limiting'],
+            recommendedActions: [
+              'Deploy nightly prompt diagnostic sweeps across top 50 industry queries',
+              'Generate dynamic schema markup recommendations for top 20 landing pages'
+            ],
+            evidenceType: 'AI_ANALYSIS'
+          },
+          {
+            name: 'Autonomous Knowledge Vault Harmonizer',
+            description: 'Synchronize verified company docs, brand guidelines, and pricing into an authoritative vector knowledge base.',
+            strategicRationale: 'Eliminates conflicting citations and ensures LLMs receive precise, up-to-date facts.',
+            priority: 'HIGH',
+            expectedImpact: 'HIGH',
+            estimatedEffort: 'MEDIUM',
+            estimatedCost: '$6,000',
+            risks: ['Outdated customer documentation being ingested'],
+            recommendedActions: [
+              'Conduct workspace document audit',
+              'Set up human-in-the-loop review workflow for draft knowledge articles'
+            ],
+            evidenceType: 'AI_ANALYSIS'
+          },
+          {
+            name: 'Pilot Customer Proof-of-Concept Program',
+            description: 'Onboard 15 early-adopter B2B SaaS accounts to validate citation uplift and gather case study data.',
+            strategicRationale: 'Provides verified proof points for broad public launch and marketing collateral.',
+            priority: 'HIGH',
+            expectedImpact: 'MEDIUM',
+            estimatedEffort: 'LOW',
+            estimatedCost: '$3,500',
+            risks: ['Customer churn if early citation gains fluctuate'],
+            recommendedActions: [
+              'Draft customer onboarding playbook',
+              'Schedule bi-weekly review meetings with pilot stakeholders'
+            ],
+            evidenceType: 'AI_ANALYSIS'
+          }
+        ],
+        roadmaps: [
+          {
+            title: 'Strategic AEO Market Execution Roadmap',
+            description: 'Phased rollout from technical foundation to pilot customer validation and market launch.',
+            phases: [
+              {
+                phaseOrder: 1,
+                name: 'Phase 1: Foundation & Diagnostic Baseline',
+                description: 'Build core crawlers, audit existing brand citations, and deploy knowledge schema.',
+                milestones: [
+                  {
+                    title: 'Diagnostic Crawler MVP Live',
+                    description: 'Automated prompt testing running against Perplexity and OpenAI search.',
+                    targetDays: 21,
+                    successCriteria: 'Daily citation reports generated for top 50 target keywords with zero missed runs.'
+                  },
+                  {
+                    title: 'Brand Knowledge Base Certified',
+                    description: 'All core documentation verified and synced to knowledge vault.',
+                    targetDays: 35,
+                    successCriteria: '100% of product and pricing docs audited with human approval.'
+                  }
+                ]
+              },
+              {
+                phaseOrder: 2,
+                name: 'Phase 2: Customer Validation & Acceleration',
+                description: 'Onboard pilot cohort, verify citation increases, and refine scoring algorithms.',
+                milestones: [
+                  {
+                    title: '15 Active Pilot Accounts Onboarded',
+                    description: 'Full telemetry enabled and bi-weekly reviews initiated.',
+                    targetDays: 60,
+                    successCriteria: '15 enterprise workspaces using daily citation tracking.'
+                  },
+                  {
+                    title: 'First 5 Documented Citation Wins',
+                    description: 'Verify 5 distinct brand inclusions in LLM answers resulting from injected schema.',
+                    targetDays: 75,
+                    successCriteria: 'Documented before-and-after citation proof with customer signoff.'
+                  }
+                ]
+              },
+              {
+                phaseOrder: 3,
+                name: 'Phase 3: Broad Market Launch',
+                description: 'Commercial GA release with self-serve onboarding and partner integrations.',
+                milestones: [
+                  {
+                    title: 'Public Launch Announcement',
+                    description: 'Press release, Product Hunt debut, and customer webinars.',
+                    targetDays: 90,
+                    successCriteria: 'Over 500 new workspace signups in the first 14 days.'
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        recommendations: [
+          {
+            title: 'Prioritize Schema Markup Injection over General Backlinks',
+            recommendation: 'Answer engines prioritize semantic schema clarity over raw link volume when selecting authoritative citation sources.',
+            category: 'STRATEGY',
+            impact: 'HIGH',
+            urgency: 'HIGH',
+            evidenceType: 'AI_ANALYSIS'
+          },
+          {
+            title: 'Institute Monthly Strategy Review Cadence',
+            recommendation: 'Establish formal monthly executive reviews to rebalance initiative priorities against live citation metrics.',
+            category: 'GOVERNANCE',
+            impact: 'MEDIUM',
+            urgency: 'MEDIUM',
+            evidenceType: 'AI_ANALYSIS'
+          }
+        ]
+      };
+      responseContent = JSON.stringify(planData, null, 2);
+    } else if (request.systemPrompt?.includes('DISCOVER_RESEARCH') || lower.includes('research topic:') || lower.includes('research') && lower.includes('objective')) {
       const researchData = {
         executiveSummary: `Comprehensive market and opportunity intelligence analysis for "${lastUserMessage.slice(0, 100)}". This analysis synthesized industry signals, search demand, competitive landscapes, and audience friction points.`,
         methodology: `Multi-signal AI synthesis incorporating workspace brand context, published knowledge base documents, and structured competitive benchmarking.`,

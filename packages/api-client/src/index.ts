@@ -82,6 +82,35 @@ import {
   CreateMarketOpportunityRequest,
   UpdateMarketOpportunityRequest,
   CreateAEOResearchQuestionRequest,
+  StrategicPlanDto,
+  StrategicPlanDetailDto,
+  StrategicPlanVersionDto,
+  CreateStrategicPlanRequest,
+  GenerateStrategicPlanRequest,
+  UpdateStrategicPlanRequest,
+  BusinessGoalDto,
+  GoalProgressRecordDto,
+  CreateBusinessGoalRequest,
+  UpdateBusinessGoalRequest,
+  RecordGoalProgressRequest,
+  StrategicInitiativeDto,
+  CreateStrategicInitiativeRequest,
+  UpdateStrategicInitiativeRequest,
+  ConvertInitiativeToProjectRequest,
+  InitiativeDependencyDto,
+  CreateInitiativeDependencyRequest,
+  StrategicRoadmapDto,
+  CreateStrategicRoadmapRequest,
+  UpdateStrategicRoadmapRequest,
+  RoadmapPhaseDto,
+  CreateRoadmapPhaseRequest,
+  RoadmapMilestoneDto,
+  CreateRoadmapMilestoneRequest,
+  UpdateRoadmapMilestoneRequest,
+  StrategyReviewDto,
+  CreateStrategyReviewRequest,
+  PlanningRecommendationDto,
+  PlanningOverviewDto,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -963,5 +992,316 @@ export class AeoNexusApiClient {
 
   async getDiscoverReports(workspaceId: string): Promise<ResearchProjectDto[]> {
     return this.request<ResearchProjectDto[]>(`/workspaces/${workspaceId}/discover/reports`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase 6B: Plan — Strategic Planning & Roadmap API Methods
+  // ---------------------------------------------------------------------------
+
+  async getPlanningOverview(workspaceId: string): Promise<PlanningOverviewDto> {
+    return this.request<PlanningOverviewDto>(`/workspaces/${workspaceId}/plan/overview`);
+  }
+
+  async listStrategicPlans(
+    workspaceId: string,
+    params?: { status?: string; planType?: string },
+  ): Promise<StrategicPlanDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.planType) searchParams.set('planType', params.planType);
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request<StrategicPlanDto[]>(`/workspaces/${workspaceId}/plan/strategies${qs}`);
+  }
+
+  async getStrategicPlan(workspaceId: string, planId: string): Promise<StrategicPlanDetailDto> {
+    return this.request<StrategicPlanDetailDto>(`/workspaces/${workspaceId}/plan/strategies/${planId}`);
+  }
+
+  async createStrategicPlan(
+    workspaceId: string,
+    payload: CreateStrategicPlanRequest,
+  ): Promise<StrategicPlanDto> {
+    return this.request<StrategicPlanDto>(`/workspaces/${workspaceId}/plan/strategies`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async generateStrategicPlan(
+    workspaceId: string,
+    payload: GenerateStrategicPlanRequest,
+  ): Promise<StrategicPlanDto> {
+    return this.request<StrategicPlanDto>(`/workspaces/${workspaceId}/plan/strategies/generate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateStrategicPlan(
+    workspaceId: string,
+    planId: string,
+    payload: UpdateStrategicPlanRequest,
+  ): Promise<StrategicPlanDto> {
+    return this.request<StrategicPlanDto>(`/workspaces/${workspaceId}/plan/strategies/${planId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async approveStrategicPlan(workspaceId: string, planId: string): Promise<StrategicPlanDto> {
+    return this.request<StrategicPlanDto>(`/workspaces/${workspaceId}/plan/strategies/${planId}/approve`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteStrategicPlan(workspaceId: string, planId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/plan/strategies/${planId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getPlanVersions(workspaceId: string, planId: string): Promise<StrategicPlanVersionDto[]> {
+    return this.request<StrategicPlanVersionDto[]>(`/workspaces/${workspaceId}/plan/strategies/${planId}/versions`);
+  }
+
+  // Goals
+  async listBusinessGoals(
+    workspaceId: string,
+    params?: { planId?: string; category?: string; status?: string },
+  ): Promise<BusinessGoalDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.planId) searchParams.set('planId', params.planId);
+    if (params?.category) searchParams.set('category', params.category);
+    if (params?.status) searchParams.set('status', params.status);
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request<BusinessGoalDto[]>(`/workspaces/${workspaceId}/plan/goals${qs}`);
+  }
+
+  async getBusinessGoal(workspaceId: string, goalId: string): Promise<BusinessGoalDto> {
+    return this.request<BusinessGoalDto>(`/workspaces/${workspaceId}/plan/goals/${goalId}`);
+  }
+
+  async createBusinessGoal(
+    workspaceId: string,
+    payload: CreateBusinessGoalRequest,
+  ): Promise<BusinessGoalDto> {
+    return this.request<BusinessGoalDto>(`/workspaces/${workspaceId}/plan/goals`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateBusinessGoal(
+    workspaceId: string,
+    goalId: string,
+    payload: UpdateBusinessGoalRequest,
+  ): Promise<BusinessGoalDto> {
+    return this.request<BusinessGoalDto>(`/workspaces/${workspaceId}/plan/goals/${goalId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteBusinessGoal(workspaceId: string, goalId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/plan/goals/${goalId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async recordGoalProgress(
+    workspaceId: string,
+    goalId: string,
+    payload: RecordGoalProgressRequest,
+  ): Promise<GoalProgressRecordDto> {
+    return this.request<GoalProgressRecordDto>(`/workspaces/${workspaceId}/plan/goals/${goalId}/progress`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Initiatives
+  async listStrategicInitiatives(
+    workspaceId: string,
+    params?: { planId?: string; goalId?: string; priority?: string; status?: string },
+  ): Promise<StrategicInitiativeDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.planId) searchParams.set('planId', params.planId);
+    if (params?.goalId) searchParams.set('goalId', params.goalId);
+    if (params?.priority) searchParams.set('priority', params.priority);
+    if (params?.status) searchParams.set('status', params.status);
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request<StrategicInitiativeDto[]>(`/workspaces/${workspaceId}/plan/initiatives${qs}`);
+  }
+
+  async getStrategicInitiative(workspaceId: string, initiativeId: string): Promise<StrategicInitiativeDto> {
+    return this.request<StrategicInitiativeDto>(`/workspaces/${workspaceId}/plan/initiatives/${initiativeId}`);
+  }
+
+  async createStrategicInitiative(
+    workspaceId: string,
+    payload: CreateStrategicInitiativeRequest,
+  ): Promise<StrategicInitiativeDto> {
+    return this.request<StrategicInitiativeDto>(`/workspaces/${workspaceId}/plan/initiatives`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateStrategicInitiative(
+    workspaceId: string,
+    initiativeId: string,
+    payload: UpdateStrategicInitiativeRequest,
+  ): Promise<StrategicInitiativeDto> {
+    return this.request<StrategicInitiativeDto>(`/workspaces/${workspaceId}/plan/initiatives/${initiativeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteStrategicInitiative(workspaceId: string, initiativeId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/plan/initiatives/${initiativeId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async convertInitiativeToProject(
+    workspaceId: string,
+    initiativeId: string,
+    payload: ConvertInitiativeToProjectRequest,
+  ): Promise<ProjectDto> {
+    return this.request<ProjectDto>(`/workspaces/${workspaceId}/plan/initiatives/${initiativeId}/convert-to-project`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async addInitiativeDependency(
+    workspaceId: string,
+    initiativeId: string,
+    payload: CreateInitiativeDependencyRequest,
+  ): Promise<InitiativeDependencyDto> {
+    return this.request<InitiativeDependencyDto>(
+      `/workspaces/${workspaceId}/plan/initiatives/${initiativeId}/dependencies`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async removeInitiativeDependency(
+    workspaceId: string,
+    initiativeId: string,
+    dependencyId: string,
+  ): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(
+      `/workspaces/${workspaceId}/plan/initiatives/${initiativeId}/dependencies/${dependencyId}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  }
+
+  // Roadmaps & Milestones
+  async listRoadmaps(workspaceId: string, planId?: string): Promise<StrategicRoadmapDto[]> {
+    const qs = planId ? `?planId=${planId}` : '';
+    return this.request<StrategicRoadmapDto[]>(`/workspaces/${workspaceId}/plan/roadmaps${qs}`);
+  }
+
+  async getRoadmap(workspaceId: string, roadmapId: string): Promise<StrategicRoadmapDto> {
+    return this.request<StrategicRoadmapDto>(`/workspaces/${workspaceId}/plan/roadmaps/${roadmapId}`);
+  }
+
+  async createRoadmap(
+    workspaceId: string,
+    payload: CreateStrategicRoadmapRequest,
+  ): Promise<StrategicRoadmapDto> {
+    return this.request<StrategicRoadmapDto>(`/workspaces/${workspaceId}/plan/roadmaps`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createRoadmapPhase(
+    workspaceId: string,
+    roadmapId: string,
+    payload: CreateRoadmapPhaseRequest,
+  ): Promise<RoadmapPhaseDto> {
+    return this.request<RoadmapPhaseDto>(`/workspaces/${workspaceId}/plan/roadmaps/${roadmapId}/phases`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listMilestones(
+    workspaceId: string,
+    params?: { roadmapId?: string; isOverdue?: boolean },
+  ): Promise<RoadmapMilestoneDto[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.roadmapId) searchParams.set('roadmapId', params.roadmapId);
+    if (params?.isOverdue !== undefined) searchParams.set('isOverdue', String(params.isOverdue));
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return this.request<RoadmapMilestoneDto[]>(`/workspaces/${workspaceId}/plan/milestones${qs}`);
+  }
+
+  async createMilestone(
+    workspaceId: string,
+    payload: CreateRoadmapMilestoneRequest,
+  ): Promise<RoadmapMilestoneDto> {
+    return this.request<RoadmapMilestoneDto>(`/workspaces/${workspaceId}/plan/milestones`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateMilestone(
+    workspaceId: string,
+    milestoneId: string,
+    payload: UpdateRoadmapMilestoneRequest,
+  ): Promise<RoadmapMilestoneDto> {
+    return this.request<RoadmapMilestoneDto>(`/workspaces/${workspaceId}/plan/milestones/${milestoneId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteMilestone(workspaceId: string, milestoneId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/plan/milestones/${milestoneId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Reviews
+  async listStrategyReviews(workspaceId: string, planId?: string): Promise<StrategyReviewDto[]> {
+    const qs = planId ? `?planId=${planId}` : '';
+    return this.request<StrategyReviewDto[]>(`/workspaces/${workspaceId}/plan/reviews${qs}`);
+  }
+
+  async createStrategyReview(
+    workspaceId: string,
+    payload: CreateStrategyReviewRequest,
+  ): Promise<StrategyReviewDto> {
+    return this.request<StrategyReviewDto>(`/workspaces/${workspaceId}/plan/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Recommendations
+  async listPlanningRecommendations(workspaceId: string, planId?: string): Promise<PlanningRecommendationDto[]> {
+    const qs = planId ? `?planId=${planId}` : '';
+    return this.request<PlanningRecommendationDto[]>(`/workspaces/${workspaceId}/plan/recommendations${qs}`);
+  }
+
+  async actionPlanningRecommendation(
+    workspaceId: string,
+    recommendationId: string,
+  ): Promise<PlanningRecommendationDto> {
+    return this.request<PlanningRecommendationDto>(
+      `/workspaces/${workspaceId}/plan/recommendations/${recommendationId}/action`,
+      {
+        method: 'POST',
+      },
+    );
   }
 }
