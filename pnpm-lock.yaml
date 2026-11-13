@@ -133,6 +133,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@aeo-nexus/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@aeo-nexus/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -163,6 +166,9 @@ importers:
       bcrypt:
         specifier: ^5.1.1
         version: 5.1.1
+      bullmq:
+        specifier: ^5.34.12
+        version: 5.81.5
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1

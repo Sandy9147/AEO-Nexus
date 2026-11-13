@@ -36,3 +36,4 @@ export interface IAiTool {
 
   execute(args: Record<string, unknown>, context: ToolExecutionContext): Promise<ToolExecutionResult>;
 }
+

@@ -10,3 +10,4 @@ export interface IEmbeddingService {
   generateEmbedding(text: string): Promise<EmbeddingResult>;
   generateBatchEmbeddings(texts: string[]): Promise<EmbeddingResult[]>;
 }
+

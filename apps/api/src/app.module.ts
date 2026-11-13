@@ -11,6 +11,7 @@ import { AssetsModule } from './assets/assets.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AiModule } from './ai/ai.module';
+import { DiscoverModule } from './discover/discover.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AiModule } from './ai/ai.module';
     KnowledgeModule,
     NotificationsModule,
     AiModule,
+    DiscoverModule,
   ],
 })
 export class AppModule {}

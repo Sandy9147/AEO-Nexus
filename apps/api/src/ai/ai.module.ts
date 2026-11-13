@@ -40,7 +40,10 @@ import { AiController } from './ai.controller';
     AgentOrchestratorService,
     AiToolRegistryService,
     KnowledgeRetrievalService,
+    WorkspaceContextService,
     AiApprovalsService,
+    MockAiProvider,
   ],
 })
 export class AiModule {}
+

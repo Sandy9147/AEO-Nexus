@@ -195,3 +195,4 @@ The Neon PostgreSQL database includes the following tables:
 - `ai_usage_records`: Immutable token and financial audit ledger.
 - `ai_workspace_configs`: Per-workspace model preferences, budget limits, and custom system directives.
 - `ai_prompt_templates`: Library of curated prompts (Business Plan, SEO Audit, Marketing Strategy).
+

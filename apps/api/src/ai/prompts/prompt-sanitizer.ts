@@ -98,3 +98,4 @@ ${docBlocks}
     return lines.join('\n');
   }
 }
+

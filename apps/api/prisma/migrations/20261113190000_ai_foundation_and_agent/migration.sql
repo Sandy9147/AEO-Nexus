@@ -212,3 +212,4 @@ ALTER TABLE "ai_usage_records" ADD CONSTRAINT "ai_usage_records_user_id_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "ai_workspace_configs" ADD CONSTRAINT "ai_workspace_configs_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

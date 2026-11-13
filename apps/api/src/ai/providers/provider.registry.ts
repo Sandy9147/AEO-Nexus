@@ -81,3 +81,4 @@ export class AiProviderRegistry {
     return MODEL_CATALOG.find((m) => m.id === modelId);
   }
 }
+

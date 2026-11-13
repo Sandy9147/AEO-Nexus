@@ -30,33 +30,30 @@ export class WorkspaceContextService {
     // 1. Verify caller has active membership in this workspace
     await this.workspacesService.verifyMembership(workspaceId, userId);
 
-    // 2. Fetch business & brand profiles (bounded 1:1)
-    const [businessProfile, brandProfile, recentProjects, assignedTasks, assetsCount] =
-      await Promise.all([
-        this.prisma.businessProfile.findUnique({ where: { workspaceId } }),
-        this.prisma.brandProfile.findUnique({ where: { workspaceId } }),
-        this.prisma.project.findMany({
-          where: { workspaceId, status: { in: ['ACTIVE', 'PLANNING'] } },
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            tasks: { select: { status: true } },
-          },
-          take: 5,
-          orderBy: { updatedAt: 'desc' },
-        }),
-        this.prisma.task.findMany({
-          where: {
-            workspaceId,
-            status: { in: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'] },
-          },
-          select: { id: true, title: true, status: true, priority: true },
-          take: 5,
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.asset.count({ where: { workspaceId } }),
-      ]);
+    // 2. Fetch business & brand profiles (bounded 1:1) sequentially to avoid connection pool exhaustion
+    const businessProfile = await this.prisma.businessProfile.findUnique({ where: { workspaceId } });
+    const brandProfile = await this.prisma.brandProfile.findUnique({ where: { workspaceId } });
+    const recentProjects = await this.prisma.project.findMany({
+      where: { workspaceId, status: { in: ['ACTIVE', 'PLANNING'] } },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        tasks: { select: { status: true } },
+      },
+      take: 5,
+      orderBy: { updatedAt: 'desc' },
+    });
+    const assignedTasks = await this.prisma.task.findMany({
+      where: {
+        workspaceId,
+        status: { in: ['TODO', 'IN_PROGRESS', 'IN_REVIEW'] },
+      },
+      select: { id: true, title: true, status: true, priority: true },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+    });
+    const assetsCount = await this.prisma.asset.count({ where: { workspaceId } });
 
     // Format safe summaries
     const businessSummary = businessProfile

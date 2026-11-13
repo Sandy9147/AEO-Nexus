@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { processWorkflowJob } from './processors/health.processor';
 import { processAiRunJob } from './processors/ai-run.processor';
+import { processDiscoverResearchJob } from './processors/discover-research.processor';
 
 async function bootstrap() {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -35,6 +36,11 @@ async function bootstrap() {
     concurrency: 3,
   });
 
+  const discoverWorker = new Worker('aeo-nexus-research', processDiscoverResearchJob, {
+    connection,
+    concurrency: 3,
+  });
+
   workflowWorker.on('completed', (job) => {
     console.log(`[Workflow Worker] Job ${job.id} completed successfully`);
   });
@@ -51,14 +57,23 @@ async function bootstrap() {
     console.error(`[AI Worker] Job ${job?.id} failed with error:`, err);
   });
 
+  discoverWorker.on('completed', (job) => {
+    console.log(`[Discover Worker] Job ${job.id} completed successfully`);
+  });
+
+  discoverWorker.on('failed', (job, err) => {
+    console.error(`[Discover Worker] Job ${job?.id} failed with error:`, err);
+  });
+
   console.log(
-    '⚡ AEO Nexus Worker is running and listening for jobs on queues "aeo-nexus-workflows" and "aeo-nexus-ai-runs"',
+    '⚡ AEO Nexus Worker is running and listening for jobs on queues "aeo-nexus-workflows", "aeo-nexus-ai-runs", and "aeo-nexus-research"',
   );
 
   const shutdown = async () => {
     console.log('[Worker] Shutting down gracefully...');
     await workflowWorker.close();
     await aiWorker.close();
+    await discoverWorker.close();
     await connection.quit();
     process.exit(0);
   };

@@ -125,6 +125,7 @@ model User {
   aiRequestedApprovals    AIApproval[]               @relation("ApprovalRequester")
   aiReviewedApprovals     AIApproval[]               @relation("ApprovalReviewer")
   aiUsageRecords          AIUsageRecord[]
+  createdResearchProjects ResearchProject[]
 
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
@@ -208,6 +209,11 @@ model Workspace {
   aiApprovals        AIApproval[]
   aiUsageRecords     AIUsageRecord[]
   aiConfig           AIWorkspaceConfig?
+  researchProjects   ResearchProject[]
+  competitors        Competitor[]
+  audienceProfiles   AudienceProfile[]
+  marketOpportunities MarketOpportunity[]
+  aeoResearchQuestions AEOResearchQuestion[]
 
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -768,4 +774,270 @@ model AIPromptTemplate {
   @@index([workspaceId])
   @@index([slug])
   @@map("ai_prompt_templates")
+}
+
+// ==============================================================================
+// Phase 6A: Discover — AI Business Research & Opportunity Intelligence Models
+// ==============================================================================
+
+enum ResearchStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum EvidenceType {
+  VERIFIED_SOURCE
+  AI_ANALYSIS
+  USER_INPUT
+  UNVERIFIED_ASSUMPTION
+}
+
+enum ConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+  SPECULATIVE
+}
+
+enum SourceType {
+  WEB_SEARCH
+  KNOWLEDGE_VAULT
+  INDUSTRY_REPORT
+  USER_DOCUMENT
+  OFFLINE_KNOWLEDGE
+}
+
+model ResearchProject {
+  id                  String             @id @default(uuid())
+  workspaceId         String             @map("workspace_id")
+  createdById         String             @map("created_by_id")
+  title               String
+  topic               String
+  industry            String?
+  targetCountry       String?            @map("target_country")
+  targetAudience      String?            @map("target_audience")
+  businessDescription String?            @map("business_description")
+  objective           String             @default("COMPREHENSIVE") // MARKET_OPPORTUNITY, COMPETITOR_ANALYSIS, AUDIENCE_DISCOVERY, TRENDS, AEO_DISCOVERY, COMPREHENSIVE
+  status              ResearchStatus     @default(PENDING)
+  executiveSummary    String?            @map("executive_summary")
+  methodology         String?
+  confidenceScore     Float              @default(0.85) @map("confidence_score")
+  tokensUsed          Int                @default(0) @map("tokens_used")
+  completedAt         DateTime?          @map("completed_at")
+
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy           User               @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  runs                ResearchRun[]
+  findings            ResearchFinding[]
+  sources             ResearchSource[]
+  opportunities       MarketOpportunity[]
+  competitors         Competitor[]
+  audienceProfiles    AudienceProfile[]
+  aeoQuestions        AEOResearchQuestion[]
+
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([createdById])
+  @@index([status])
+  @@map("research_projects")
+}
+
+model ResearchRun {
+  id               String          @id @default(uuid())
+  researchId       String          @map("research_id")
+  status           ResearchStatus  @default(PENDING)
+  provider         String
+  model            String
+  prompt           String?
+  rawResponse      String?         @map("raw_response")
+  error            String?
+  promptTokens     Int             @default(0) @map("prompt_tokens")
+  completionTokens Int             @default(0) @map("completion_tokens")
+  totalTokens      Int             @default(0) @map("total_tokens")
+  latencyMs        Int             @default(0) @map("latency_ms")
+
+  research         ResearchProject @relation(fields: [researchId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  @@index([researchId])
+  @@index([status])
+  @@map("research_runs")
+}
+
+model ResearchFinding {
+  id               String          @id @default(uuid())
+  researchId       String          @map("research_id")
+  category         String          // MARKET_DEMAND, COMPETITIVE_LANDSCAPE, CUSTOMER_PAIN, PRICING, TREND, THREAT, AEO_VISIBILITY
+  title            String
+  description      String
+  evidenceType     EvidenceType    @default(AI_ANALYSIS) @map("evidence_type")
+  confidenceLevel  ConfidenceLevel @default(MEDIUM) @map("confidence_level")
+  evidenceDetails  String?         @map("evidence_details")
+  risks            String?
+  recommendations  String?
+
+  research         ResearchProject @relation(fields: [researchId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  @@index([researchId])
+  @@index([category])
+  @@map("research_findings")
+}
+
+model ResearchSource {
+  id              String          @id @default(uuid())
+  researchId      String          @map("research_id")
+  title           String
+  url             String?
+  sourceType      SourceType      @default(KNOWLEDGE_VAULT) @map("source_type")
+  publicationDate String?         @map("publication_date")
+  accessTimestamp DateTime        @default(now()) @map("access_timestamp")
+  snippet         String?
+  isVerified      Boolean         @default(false) @map("is_verified")
+
+  research        ResearchProject @relation(fields: [researchId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@index([researchId])
+  @@map("research_sources")
+}
+
+model Competitor {
+  id                            String          @id @default(uuid())
+  workspaceId                   String          @map("workspace_id")
+  researchId                    String?         @map("research_id")
+  name                          String
+  website                       String?
+  industry                      String?
+  description                   String?
+  productsServices              String?         @map("products_services")
+  positioning                   String?
+  pricingObservations           String?         @map("pricing_observations")
+  contentObservations           String?         @map("content_observations")
+  strengths                     String[]        @default([])
+  weaknesses                    String[]        @default([])
+  differentiationOpportunities  String?         @map("differentiation_opportunities")
+  evidenceType                  EvidenceType    @default(AI_ANALYSIS) @map("evidence_type")
+  isVerified                    Boolean         @default(false) @map("is_verified")
+
+  workspace                     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  research                      ResearchProject? @relation(fields: [researchId], references: [id], onDelete: SetNull)
+
+  createdAt                     DateTime        @default(now()) @map("created_at")
+  updatedAt                     DateTime        @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([researchId])
+  @@map("competitors")
+}
+
+model AudienceProfile {
+  id                    String          @id @default(uuid())
+  workspaceId           String          @map("workspace_id")
+  researchId            String?         @map("research_id")
+  segmentName           String          @map("segment_name")
+  isAiGenerated         Boolean         @default(true) @map("is_ai_generated")
+  idealCustomerProfile  String?         @map("ideal_customer_profile")
+  demographics          String?
+  painPoints            String[]        @default([]) @map("pain_points")
+  needs                 String[]        @default([])
+  buyingMotivations     String[]        @default([]) @map("buying_motivations")
+  objections            String[]        @default([])
+  customerJourney       Json?           @map("customer_journey")
+
+  workspace             Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  research              ResearchProject? @relation(fields: [researchId], references: [id], onDelete: SetNull)
+
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([researchId])
+  @@map("audience_profiles")
+}
+
+model MarketOpportunity {
+  id                     String          @id @default(uuid())
+  workspaceId            String          @map("workspace_id")
+  researchId             String?         @map("research_id")
+  title                  String
+  description            String
+  customerProblem        String          @map("customer_problem")
+  marketDemandEvidence   String          @map("market_demand_evidence")
+  competitionAnalysis    String?         @map("competition_analysis")
+  differentiation        String
+  businessFeasibility    String?         @map("business_feasibility")
+  potentialBusinessModel String?         @map("potential_business_model")
+  assumptions            String[]        @default([])
+  risks                  String[]        @default([])
+  confidenceLevel        ConfidenceLevel @default(MEDIUM) @map("confidence_level")
+  suggestedExperiment    String          @map("suggested_experiment")
+  evidenceType           EvidenceType    @default(AI_ANALYSIS) @map("evidence_type")
+  status                 String          @default("DISCOVERED") // DISCOVERED, VALIDATING, PURSUED, ARCHIVED
+
+  workspace              Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  research               ResearchProject? @relation(fields: [researchId], references: [id], onDelete: SetNull)
+
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([researchId])
+  @@index([status])
+  @@map("market_opportunities")
+}
+
+model AEOResearchQuestion {
+  id              String             @id @default(uuid())
+  workspaceId     String             @map("workspace_id")
+  researchId      String?            @map("research_id")
+  topic           String
+  queryQuestion   String             @map("query_question")
+  targetIndustry  String?            @map("target_industry")
+  expectedPersona String?            @map("expected_persona")
+
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  research        ResearchProject?   @relation(fields: [researchId], references: [id], onDelete: SetNull)
+
+  results         AEOResearchResult[]
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([researchId])
+  @@map("aeo_research_questions")
+}
+
+model AEOResearchResult {
+  id                   String              @id @default(uuid())
+  questionId           String              @map("question_id")
+  provider             String
+  model                String
+  brandMentioned       Boolean             @default(false) @map("brand_mentioned")
+  brandRank            Int?                @map("brand_rank")
+  brandSentiment       String?             @map("brand_sentiment")
+  competitorsMentioned String[]            @default([]) @map("competitors_mentioned")
+  citations            Json?
+  rawAnswerExcerpt     String?             @map("raw_answer_excerpt")
+  isActualMeasurement Boolean             @default(false) @map("is_actual_measurement")
+  researchTimestamp    DateTime            @default(now()) @map("research_timestamp")
+
+  question             AEOResearchQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime            @default(now()) @map("created_at")
+
+  @@index([questionId])
+  @@map("aeo_research_results")
 }

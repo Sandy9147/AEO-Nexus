@@ -37,3 +37,4 @@ export async function processAiRunJob(job: Job<AiRunJobData>): Promise<{ status:
     throw err;
   }
 }
+

@@ -13,7 +13,8 @@
     "db:validate": "prisma validate",
     "db:migrate": "node scripts/verify-migration-env.js migrate dev",
     "db:deploy": "node scripts/verify-migration-env.js migrate deploy",
-    "db:status": "node scripts/verify-migration-env.js migrate status"
+    "db:status": "node scripts/verify-migration-env.js migrate status",
+    "test:phase6a": "ts-node scripts/test-phase6a-suite.ts"
   },
   "dependencies": {
     "@aeo-nexus/ai": "workspace:*",
@@ -27,6 +28,7 @@
     "@nestjs/terminus": "^10.2.3",
     "@prisma/client": "^5.22.0",
     "bcrypt": "^5.1.1",
+    "bullmq": "^5.34.12",
     "ioredis": "^5.4.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

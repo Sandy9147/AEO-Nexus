@@ -311,3 +311,4 @@ export class AiController {
     return { success: true, data, timestamp: new Date().toISOString() };
   }
 }
+

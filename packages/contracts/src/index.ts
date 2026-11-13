@@ -1035,4 +1035,292 @@ export interface AiProviderStatusDto {
   }>;
 }
 
+// ==============================================================================
+// 14. Phase 6A: Discover — AI Business Research & Opportunity Intelligence
+// ==============================================================================
+
+export type ResearchStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type EvidenceType = 'VERIFIED_SOURCE' | 'AI_ANALYSIS' | 'USER_INPUT' | 'UNVERIFIED_ASSUMPTION';
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'SPECULATIVE';
+export type SourceType = 'WEB_SEARCH' | 'KNOWLEDGE_VAULT' | 'INDUSTRY_REPORT' | 'USER_DOCUMENT' | 'OFFLINE_KNOWLEDGE';
+
+export interface ResearchProjectDto {
+  id: string;
+  workspaceId: string;
+  createdById: string;
+  title: string;
+  topic: string;
+  industry?: string | null;
+  targetCountry?: string | null;
+  targetAudience?: string | null;
+  businessDescription?: string | null;
+  objective: string;
+  status: ResearchStatus;
+  executiveSummary?: string | null;
+  methodology?: string | null;
+  confidenceScore: number;
+  tokensUsed: number;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  findingsCount?: number;
+  sourcesCount?: number;
+  opportunitiesCount?: number;
+  competitorsCount?: number;
+}
+
+export interface ResearchRunDto {
+  id: string;
+  researchId: string;
+  status: ResearchStatus;
+  provider: string;
+  model: string;
+  prompt?: string | null;
+  rawResponse?: string | null;
+  error?: string | null;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResearchFindingDto {
+  id: string;
+  researchId: string;
+  category: string;
+  title: string;
+  description: string;
+  evidenceType: EvidenceType;
+  confidenceLevel: ConfidenceLevel;
+  evidenceDetails?: string | null;
+  risks?: string | null;
+  recommendations?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResearchSourceDto {
+  id: string;
+  researchId: string;
+  title: string;
+  url?: string | null;
+  sourceType: SourceType;
+  publicationDate?: string | null;
+  accessTimestamp: string;
+  snippet?: string | null;
+  isVerified: boolean;
+  createdAt: string;
+}
+
+export interface CompetitorDto {
+  id: string;
+  workspaceId: string;
+  researchId?: string | null;
+  name: string;
+  website?: string | null;
+  industry?: string | null;
+  description?: string | null;
+  productsServices?: string | null;
+  positioning?: string | null;
+  pricingObservations?: string | null;
+  contentObservations?: string | null;
+  strengths: string[];
+  weaknesses: string[];
+  differentiationOpportunities?: string | null;
+  evidenceType: EvidenceType;
+  isVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AudienceProfileDto {
+  id: string;
+  workspaceId: string;
+  researchId?: string | null;
+  segmentName: string;
+  isAiGenerated: boolean;
+  idealCustomerProfile?: string | null;
+  demographics?: string | null;
+  painPoints: string[];
+  needs: string[];
+  buyingMotivations: string[];
+  objections: string[];
+  customerJourney?: {
+    awareness?: string[];
+    consideration?: string[];
+    decision?: string[];
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketOpportunityDto {
+  id: string;
+  workspaceId: string;
+  researchId?: string | null;
+  title: string;
+  description: string;
+  customerProblem: string;
+  marketDemandEvidence: string;
+  competitionAnalysis?: string | null;
+  differentiation: string;
+  businessFeasibility?: string | null;
+  potentialBusinessModel?: string | null;
+  assumptions: string[];
+  risks: string[];
+  confidenceLevel: ConfidenceLevel;
+  suggestedExperiment: string;
+  evidenceType: EvidenceType;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AEOResearchQuestionDto {
+  id: string;
+  workspaceId: string;
+  researchId?: string | null;
+  topic: string;
+  queryQuestion: string;
+  targetIndustry?: string | null;
+  expectedPersona?: string | null;
+  results?: AEOResearchResultDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AEOResearchResultDto {
+  id: string;
+  questionId: string;
+  provider: string;
+  model: string;
+  brandMentioned: boolean;
+  brandRank?: number | null;
+  brandSentiment?: string | null;
+  competitorsMentioned: string[];
+  citations?: Array<{ title: string; url?: string; snippet?: string }> | null;
+  rawAnswerExcerpt?: string | null;
+  isActualMeasurement: boolean;
+  researchTimestamp: string;
+  createdAt: string;
+}
+
+export interface ResearchDetailDto extends ResearchProjectDto {
+  findings: ResearchFindingDto[];
+  sources: ResearchSourceDto[];
+  opportunities: MarketOpportunityDto[];
+  competitors: CompetitorDto[];
+  audienceProfiles: AudienceProfileDto[];
+  aeoQuestions: AEOResearchQuestionDto[];
+  runs: ResearchRunDto[];
+}
+
+export interface DiscoverOverviewDto {
+  totalResearch: number;
+  completedResearch: number;
+  totalOpportunities: number;
+  totalCompetitors: number;
+  totalAudienceProfiles: number;
+  totalAeoQuestions: number;
+  recentResearch: ResearchProjectDto[];
+  recentOpportunities: MarketOpportunityDto[];
+  recentCompetitors: CompetitorDto[];
+  recentAudience: AudienceProfileDto[];
+}
+
+// Validation Schemas
+export const CreateResearchProjectSchema = z.object({
+  title: z.string().min(2).max(200),
+  topic: z.string().min(2).max(300),
+  industry: z.string().max(100).optional(),
+  targetCountry: z.string().max(100).optional(),
+  targetAudience: z.string().max(200).optional(),
+  businessDescription: z.string().max(2000).optional(),
+  objective: z.string().max(100).default('COMPREHENSIVE'),
+  additionalInstructions: z.string().max(2000).optional(),
+});
+export type CreateResearchProjectRequest = z.infer<typeof CreateResearchProjectSchema>;
+
+export const UpdateResearchProjectSchema = z.object({
+  title: z.string().min(2).max(200).optional(),
+  objective: z.string().max(100).optional(),
+  executiveSummary: z.string().optional(),
+});
+export type UpdateResearchProjectRequest = z.infer<typeof UpdateResearchProjectSchema>;
+
+export const CreateCompetitorSchema = z.object({
+  name: z.string().min(2).max(100),
+  website: z.string().url().or(z.literal('')).optional(),
+  industry: z.string().max(100).optional(),
+  description: z.string().max(2000).optional(),
+  productsServices: z.string().max(2000).optional(),
+  positioning: z.string().max(1000).optional(),
+  pricingObservations: z.string().max(1000).optional(),
+  contentObservations: z.string().max(1000).optional(),
+  strengths: z.array(z.string()).default([]),
+  weaknesses: z.array(z.string()).default([]),
+  differentiationOpportunities: z.string().max(1000).optional(),
+  evidenceType: z.enum(['VERIFIED_SOURCE', 'AI_ANALYSIS', 'USER_INPUT', 'UNVERIFIED_ASSUMPTION']).default('USER_INPUT'),
+  isVerified: z.boolean().default(false),
+  researchId: z.string().uuid().optional(),
+});
+export type CreateCompetitorRequest = z.infer<typeof CreateCompetitorSchema>;
+
+export const UpdateCompetitorSchema = CreateCompetitorSchema.partial();
+export type UpdateCompetitorRequest = z.infer<typeof UpdateCompetitorSchema>;
+
+export const CreateAudienceProfileSchema = z.object({
+  segmentName: z.string().min(2).max(100),
+  isAiGenerated: z.boolean().default(false),
+  idealCustomerProfile: z.string().max(2000).optional(),
+  demographics: z.string().max(1000).optional(),
+  painPoints: z.array(z.string()).default([]),
+  needs: z.array(z.string()).default([]),
+  buyingMotivations: z.array(z.string()).default([]),
+  objections: z.array(z.string()).default([]),
+  customerJourney: z.object({
+    awareness: z.array(z.string()).optional(),
+    consideration: z.array(z.string()).optional(),
+    decision: z.array(z.string()).optional(),
+  }).optional(),
+  researchId: z.string().uuid().optional(),
+});
+export type CreateAudienceProfileRequest = z.infer<typeof CreateAudienceProfileSchema>;
+
+export const UpdateAudienceProfileSchema = CreateAudienceProfileSchema.partial();
+export type UpdateAudienceProfileRequest = z.infer<typeof UpdateAudienceProfileSchema>;
+
+export const CreateMarketOpportunitySchema = z.object({
+  title: z.string().min(2).max(200),
+  description: z.string().min(5).max(3000),
+  customerProblem: z.string().min(5).max(2000),
+  marketDemandEvidence: z.string().min(5).max(2000),
+  competitionAnalysis: z.string().max(2000).optional(),
+  differentiation: z.string().min(5).max(2000),
+  businessFeasibility: z.string().max(2000).optional(),
+  potentialBusinessModel: z.string().max(1000).optional(),
+  assumptions: z.array(z.string()).default([]),
+  risks: z.array(z.string()).default([]),
+  confidenceLevel: z.enum(['HIGH', 'MEDIUM', 'LOW', 'SPECULATIVE']).default('MEDIUM'),
+  suggestedExperiment: z.string().min(5).max(2000),
+  evidenceType: z.enum(['VERIFIED_SOURCE', 'AI_ANALYSIS', 'USER_INPUT', 'UNVERIFIED_ASSUMPTION']).default('AI_ANALYSIS'),
+  status: z.string().default('DISCOVERED'),
+  researchId: z.string().uuid().optional(),
+});
+export type CreateMarketOpportunityRequest = z.infer<typeof CreateMarketOpportunitySchema>;
+
+export const UpdateMarketOpportunitySchema = CreateMarketOpportunitySchema.partial();
+export type UpdateMarketOpportunityRequest = z.infer<typeof UpdateMarketOpportunitySchema>;
+
+export const CreateAEOResearchQuestionSchema = z.object({
+  topic: z.string().min(2).max(200),
+  queryQuestion: z.string().min(5).max(500),
+  targetIndustry: z.string().max(100).optional(),
+  expectedPersona: z.string().max(200).optional(),
+  researchId: z.string().uuid().optional(),
+});
+export type CreateAEOResearchQuestionRequest = z.infer<typeof CreateAEOResearchQuestionSchema>;
+
 

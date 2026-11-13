@@ -63,6 +63,25 @@ import {
   AiUsageSummaryDto,
   AiToolDto,
   AiProviderStatusDto,
+  ResearchProjectDto,
+  ResearchDetailDto,
+  ResearchFindingDto,
+  ResearchSourceDto,
+  CompetitorDto,
+  AudienceProfileDto,
+  MarketOpportunityDto,
+  AEOResearchQuestionDto,
+  AEOResearchResultDto,
+  DiscoverOverviewDto,
+  CreateResearchProjectRequest,
+  UpdateResearchProjectRequest,
+  CreateCompetitorRequest,
+  UpdateCompetitorRequest,
+  CreateAudienceProfileRequest,
+  UpdateAudienceProfileRequest,
+  CreateMarketOpportunityRequest,
+  UpdateMarketOpportunityRequest,
+  CreateAEOResearchQuestionRequest,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -774,5 +793,175 @@ export class AeoNexusApiClient {
 
   async getAiPromptTemplates(workspaceId: string): Promise<AiPromptTemplateDto[]> {
     return this.request<AiPromptTemplateDto[]>(`/workspaces/${workspaceId}/ai/templates`);
+  }
+
+  // ==============================================================================
+  // Phase 6A: Discover — AI Business Research & Opportunity Intelligence
+  // ==============================================================================
+
+  async getDiscoverOverview(workspaceId: string): Promise<DiscoverOverviewDto> {
+    return this.request<DiscoverOverviewDto>(`/workspaces/${workspaceId}/discover/overview`);
+  }
+
+  async getResearchProjects(workspaceId: string): Promise<ResearchProjectDto[]> {
+    return this.request<ResearchProjectDto[]>(`/workspaces/${workspaceId}/discover/research`);
+  }
+
+  async createResearchProject(
+    workspaceId: string,
+    payload: CreateResearchProjectRequest,
+  ): Promise<ResearchDetailDto> {
+    return this.request<ResearchDetailDto>(`/workspaces/${workspaceId}/discover/research`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getResearchDetail(workspaceId: string, researchId: string): Promise<ResearchDetailDto> {
+    return this.request<ResearchDetailDto>(`/workspaces/${workspaceId}/discover/research/${researchId}`);
+  }
+
+  async cancelResearchProject(
+    workspaceId: string,
+    researchId: string,
+  ): Promise<{ success: boolean; status: string }> {
+    return this.request<{ success: boolean; status: string }>(
+      `/workspaces/${workspaceId}/discover/research/${researchId}/cancel`,
+      { method: 'POST' },
+    );
+  }
+
+  async rerunResearchProject(workspaceId: string, researchId: string): Promise<ResearchDetailDto> {
+    return this.request<ResearchDetailDto>(
+      `/workspaces/${workspaceId}/discover/research/${researchId}/rerun`,
+      { method: 'POST' },
+    );
+  }
+
+  async deleteResearchProject(workspaceId: string, researchId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/discover/research/${researchId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getMarketOpportunities(workspaceId: string, researchId?: string): Promise<MarketOpportunityDto[]> {
+    const qs = researchId ? `?researchId=${researchId}` : '';
+    return this.request<MarketOpportunityDto[]>(`/workspaces/${workspaceId}/discover/opportunities${qs}`);
+  }
+
+  async createMarketOpportunity(
+    workspaceId: string,
+    payload: CreateMarketOpportunityRequest,
+  ): Promise<MarketOpportunityDto> {
+    return this.request<MarketOpportunityDto>(`/workspaces/${workspaceId}/discover/opportunities`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateMarketOpportunity(
+    workspaceId: string,
+    opportunityId: string,
+    payload: UpdateMarketOpportunityRequest,
+  ): Promise<MarketOpportunityDto> {
+    return this.request<MarketOpportunityDto>(
+      `/workspaces/${workspaceId}/discover/opportunities/${opportunityId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async deleteMarketOpportunity(workspaceId: string, opportunityId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(
+      `/workspaces/${workspaceId}/discover/opportunities/${opportunityId}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  }
+
+  async getCompetitors(workspaceId: string, researchId?: string): Promise<CompetitorDto[]> {
+    const qs = researchId ? `?researchId=${researchId}` : '';
+    return this.request<CompetitorDto[]>(`/workspaces/${workspaceId}/discover/competitors${qs}`);
+  }
+
+  async createCompetitor(workspaceId: string, payload: CreateCompetitorRequest): Promise<CompetitorDto> {
+    return this.request<CompetitorDto>(`/workspaces/${workspaceId}/discover/competitors`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateCompetitor(
+    workspaceId: string,
+    competitorId: string,
+    payload: UpdateCompetitorRequest,
+  ): Promise<CompetitorDto> {
+    return this.request<CompetitorDto>(`/workspaces/${workspaceId}/discover/competitors/${competitorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteCompetitor(workspaceId: string, competitorId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/discover/competitors/${competitorId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getAudienceProfiles(workspaceId: string, researchId?: string): Promise<AudienceProfileDto[]> {
+    const qs = researchId ? `?researchId=${researchId}` : '';
+    return this.request<AudienceProfileDto[]>(`/workspaces/${workspaceId}/discover/audience${qs}`);
+  }
+
+  async createAudienceProfile(
+    workspaceId: string,
+    payload: CreateAudienceProfileRequest,
+  ): Promise<AudienceProfileDto> {
+    return this.request<AudienceProfileDto>(`/workspaces/${workspaceId}/discover/audience`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateAudienceProfile(
+    workspaceId: string,
+    profileId: string,
+    payload: UpdateAudienceProfileRequest,
+  ): Promise<AudienceProfileDto> {
+    return this.request<AudienceProfileDto>(`/workspaces/${workspaceId}/discover/audience/${profileId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteAudienceProfile(workspaceId: string, profileId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/discover/audience/${profileId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getMarketTrends(workspaceId: string): Promise<ResearchFindingDto[]> {
+    return this.request<ResearchFindingDto[]>(`/workspaces/${workspaceId}/discover/market-trends`);
+  }
+
+  async getAEOResearch(workspaceId: string): Promise<AEOResearchQuestionDto[]> {
+    return this.request<AEOResearchQuestionDto[]>(`/workspaces/${workspaceId}/discover/aeo-research`);
+  }
+
+  async createAEOResearchQuestion(
+    workspaceId: string,
+    payload: CreateAEOResearchQuestionRequest,
+  ): Promise<AEOResearchQuestionDto> {
+    return this.request<AEOResearchQuestionDto>(`/workspaces/${workspaceId}/discover/aeo-research`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getDiscoverReports(workspaceId: string): Promise<ResearchProjectDto[]> {
+    return this.request<ResearchProjectDto[]>(`/workspaces/${workspaceId}/discover/reports`);
   }
 }

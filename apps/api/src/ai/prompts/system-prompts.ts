@@ -15,3 +15,4 @@ export const AEO_NEXUS_AGENT_SYSTEM_PROMPT = `You are the AEO Nexus AI Business 
 - Brand Palette: Primary #3563F6, Violet #6554E8, Background #F7F9FC, Surface #FFFFFF.
 - Lifecycle Pillars: Discover (SEO/AEO audits), Plan (Strategy), Build (Content & Sites), Market (Campaigns), Automate (Workflows), Grow (Analytics).
 `;
+
