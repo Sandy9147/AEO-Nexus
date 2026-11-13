@@ -340,3 +340,4 @@ ALTER TABLE "strategy_reviews" ADD CONSTRAINT "strategy_reviews_conducted_by_id_
 -- AddForeignKey
 ALTER TABLE "planning_recommendations" ADD CONSTRAINT "planning_recommendations_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "planning_recommendations" ADD CONSTRAINT "planning_recommendations_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "strategic_plans"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+

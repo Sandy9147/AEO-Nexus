@@ -4,6 +4,7 @@ import { processWorkflowJob } from './processors/health.processor';
 import { processAiRunJob } from './processors/ai-run.processor';
 import { processDiscoverResearchJob } from './processors/discover-research.processor';
 import { processPlanGenerationJob } from './processors/plan-generation.processor';
+import { processWebsiteGenerationJob } from './processors/website-generation.processor';
 
 async function bootstrap() {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -47,6 +48,11 @@ async function bootstrap() {
     concurrency: 3,
   });
 
+  const websiteWorker = new Worker('aeo-nexus-websites', processWebsiteGenerationJob, {
+    connection,
+    concurrency: 3,
+  });
+
   workflowWorker.on('completed', (job) => {
     console.log(`[Workflow Worker] Job ${job.id} completed successfully`);
   });
@@ -79,8 +85,16 @@ async function bootstrap() {
     console.error(`[Plan Worker] Job ${job?.id} failed with error:`, err);
   });
 
+  websiteWorker.on('completed', (job) => {
+    console.log(`[Website Worker] Job ${job.id} completed successfully`);
+  });
+
+  websiteWorker.on('failed', (job, err) => {
+    console.error(`[Website Worker] Job ${job?.id} failed with error:`, err);
+  });
+
   console.log(
-    '⚡ AEO Nexus Worker is running and listening for jobs on queues "aeo-nexus-workflows", "aeo-nexus-ai-runs", "aeo-nexus-research", and "aeo-nexus-plans"',
+    '⚡ AEO Nexus Worker is running and listening for jobs on queues "aeo-nexus-workflows", "aeo-nexus-ai-runs", "aeo-nexus-research", "aeo-nexus-plans", and "aeo-nexus-websites"',
   );
 
   const shutdown = async () => {
@@ -89,6 +103,7 @@ async function bootstrap() {
     await aiWorker.close();
     await discoverWorker.close();
     await planWorker.close();
+    await websiteWorker.close();
     await connection.quit();
     process.exit(0);
   };

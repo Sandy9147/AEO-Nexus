@@ -485,6 +485,274 @@ export class MockAiProvider implements IAiProviderAdapter {
         ]
       };
       responseContent = JSON.stringify(researchData, null, 2);
+    } else if (
+      request.systemPrompt?.includes('REGENERATE_SECTION') ||
+      lower.includes('regenerate section') ||
+      lower.includes('regenerate_section')
+    ) {
+      const regeneratedSection = {
+        type: 'HERO',
+        content: {
+          badge: 'AI Refreshed Content',
+          headline: 'Elevate Your Digital Presence & Market Advantage',
+          subheadline: 'Precision-crafted digital experiences engineered for high citation authority and customer conversion.',
+          primaryCta: { text: 'Get Started Now', href: '/contact' },
+          secondaryCta: { text: 'Explore Capabilities', href: '/services' },
+        },
+      };
+      responseContent = JSON.stringify(regeneratedSection, null, 2);
+    } else if (
+      request.systemPrompt?.includes('WEBSITE_GENERATION') ||
+      request.systemPrompt?.includes('BUILD_WEBSITE') ||
+      lower.includes('website generation') ||
+      lower.includes('generate website') ||
+      lower.includes('build website')
+    ) {
+      const websiteData = {
+        theme: {
+          primaryColor: '#3563F6',
+          secondaryColor: '#6554E8',
+          backgroundColor: '#FFFFFF',
+          surfaceColor: '#F7F9FC',
+          textColor: '#0F172A',
+          headingFont: 'Inter',
+          bodyFont: 'Inter',
+          buttonStyle: 'ROUNDED',
+          borderRadius: '8px',
+          sectionSpacing: 'MEDIUM',
+        },
+        pages: [
+          {
+            title: 'Home',
+            slug: '/',
+            isHome: true,
+            seoTitle: 'Next-Generation Autonomous Business Platform | AEO Nexus',
+            seoDescription: 'Empower your business with autonomous discovery, strategic roadmaps, and visual web deployment.',
+            sections: [
+              {
+                id: 'sec_hero_home',
+                type: 'HERO',
+                order: 0,
+                content: {
+                  badge: 'Autonomous Business Platform',
+                  headline: 'Turn Strategic Vision into High-Converting Digital Reality',
+                  subheadline: 'The unified operating system that connects market discovery, execution roadmaps, and instant web publishing.',
+                  primaryCta: { text: 'Start Free Trial', href: '/contact' },
+                  secondaryCta: { text: 'View Services', href: '/services' },
+                },
+              },
+              {
+                id: 'sec_features_home',
+                type: 'FEATURES',
+                order: 1,
+                content: {
+                  title: 'Core Platform Capabilities',
+                  subtitle: 'Engineered for high visibility across generative answer engines and traditional search.',
+                  features: [
+                    {
+                      title: 'Answer Engine Optimization',
+                      description: 'Dominate conversational AI citations across Perplexity, ChatGPT, and Google AI Overviews.',
+                      icon: 'sparkles',
+                    },
+                    {
+                      title: 'Autonomous Roadmapping',
+                      description: 'Transform market research into actionable, high-impact business initiatives.',
+                      icon: 'chart',
+                    },
+                    {
+                      title: 'Visual No-Code Builder',
+                      description: 'Launch lightning-fast, responsive web pages without touching code.',
+                      icon: 'desktop',
+                    },
+                  ],
+                },
+              },
+              {
+                id: 'sec_services_summary',
+                type: 'SERVICES',
+                order: 2,
+                content: {
+                  title: 'Tailored Business Solutions',
+                  subtitle: 'Turnkey services designed to scale modern enterprises.',
+                  services: [
+                    { name: 'Citation Intelligence', description: 'Automated auditing of brand authority across AI models.' },
+                    { name: 'Strategic Execution', description: 'Milestone tracking and resource allocation for growth initiatives.' },
+                    { name: 'Edge Web Publishing', description: 'Instant, secure hosting on custom platform subdomains.' },
+                  ],
+                },
+              },
+              {
+                id: 'sec_cta_home',
+                type: 'CTA',
+                order: 3,
+                content: {
+                  headline: 'Ready to accelerate your market presence?',
+                  subheadline: 'Join modern organizations scaling their business with AEO Nexus.',
+                  buttonText: 'Get Started Today',
+                  buttonHref: '/contact',
+                },
+              },
+              {
+                id: 'sec_footer_home',
+                type: 'FOOTER',
+                order: 4,
+                content: {
+                  brandName: 'AEO Nexus',
+                  copyright: '© 2026 AEO Nexus Inc. All rights reserved.',
+                  links: [
+                    { label: 'Home', href: '/' },
+                    { label: 'About', href: '/about' },
+                    { label: 'Services', href: '/services' },
+                    { label: 'Contact', href: '/contact' },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            title: 'About',
+            slug: '/about',
+            isHome: false,
+            seoTitle: 'About Us | Pioneering Autonomous Operations',
+            seoDescription: 'Learn how AEO Nexus is redefining business operations and AI search visibility.',
+            sections: [
+              {
+                id: 'sec_about_main',
+                type: 'ABOUT',
+                order: 0,
+                content: {
+                  title: 'Our Mission & Vision',
+                  subtitle: 'Bridging the gap between strategic intent and digital execution',
+                  body: 'We founded AEO Nexus to solve the growing fragmentation in modern business software. By combining autonomous discovery, structured business planning, and visual web builders, we empower teams to operate at maximum velocity.',
+                  stats: [
+                    { label: 'Active Workspaces', value: '1,200+' },
+                    { label: 'Citation Uplift', value: '42%' },
+                    { label: 'Time Saved per Initiative', value: '35 hrs' },
+                  ],
+                },
+              },
+              {
+                id: 'sec_footer_about',
+                type: 'FOOTER',
+                order: 1,
+                content: {
+                  brandName: 'AEO Nexus',
+                  copyright: '© 2026 AEO Nexus Inc. All rights reserved.',
+                  links: [
+                    { label: 'Home', href: '/' },
+                    { label: 'About', href: '/about' },
+                    { label: 'Services', href: '/services' },
+                    { label: 'Contact', href: '/contact' },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            title: 'Services',
+            slug: '/services',
+            isHome: false,
+            seoTitle: 'Services & Capabilities | AEO Nexus',
+            seoDescription: 'Explore our comprehensive suite of autonomous intelligence and web publishing tools.',
+            sections: [
+              {
+                id: 'sec_services_main',
+                type: 'SERVICES',
+                order: 0,
+                content: {
+                  title: 'Comprehensive Business Capabilities',
+                  subtitle: 'Modular solutions tailored to high-growth teams and agencies.',
+                  services: [
+                    { name: 'AI Business Discovery', description: 'Discover unaddressed market opportunities and competitive vulnerabilities in real-time.' },
+                    { name: 'Autonomous Strategic Planning', description: 'Formulate quantifiable business goals, initiatives, and phased execution roadmaps.' },
+                    { name: 'Visual Landing Page Builder', description: 'Create responsive, conversion-focused websites backed by clean, allowlisted section templates.' },
+                  ],
+                },
+              },
+              {
+                id: 'sec_pricing_main',
+                type: 'PRICING',
+                order: 1,
+                content: {
+                  title: 'Transparent Pricing Plans',
+                  subtitle: 'Simple, predictable plans designed to scale with your organization.',
+                  tiers: [
+                    {
+                      name: 'Starter',
+                      price: '$49/mo',
+                      description: 'Perfect for small businesses establishing their digital footprint.',
+                      features: ['1 Published Website', 'Monthly AEO Audit', 'Standard Support'],
+                      ctaText: 'Start Starter',
+                      ctaHref: '/contact',
+                    },
+                    {
+                      name: 'Pro',
+                      price: '$149/mo',
+                      description: 'For growing businesses demanding deep AEO visibility and execution roadmaps.',
+                      features: ['5 Published Websites', 'Weekly AEO Diagnostics', 'AI Strategic Planning', 'Priority Support'],
+                      highlighted: true,
+                      ctaText: 'Start Pro',
+                      ctaHref: '/contact',
+                    },
+                  ],
+                },
+              },
+              {
+                id: 'sec_footer_services',
+                type: 'FOOTER',
+                order: 2,
+                content: {
+                  brandName: 'AEO Nexus',
+                  copyright: '© 2026 AEO Nexus Inc. All rights reserved.',
+                  links: [
+                    { label: 'Home', href: '/' },
+                    { label: 'About', href: '/about' },
+                    { label: 'Services', href: '/services' },
+                    { label: 'Contact', href: '/contact' },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            title: 'Contact',
+            slug: '/contact',
+            isHome: false,
+            seoTitle: 'Contact Our Team | AEO Nexus',
+            seoDescription: 'Reach out to our specialists to discuss your business growth and web deployment needs.',
+            sections: [
+              {
+                id: 'sec_contact_main',
+                type: 'CONTACT',
+                order: 0,
+                content: {
+                  headline: 'Connect with Our Strategy Team',
+                  subheadline: 'Have questions or want a guided demonstration? We are here to help.',
+                  email: 'solutions@aeonexus.com',
+                  phone: '+1 (800) 555-0199',
+                  address: '100 Market St, Suite 400, San Francisco, CA',
+                },
+              },
+              {
+                id: 'sec_footer_contact',
+                type: 'FOOTER',
+                order: 1,
+                content: {
+                  brandName: 'AEO Nexus',
+                  copyright: '© 2026 AEO Nexus Inc. All rights reserved.',
+                  links: [
+                    { label: 'Home', href: '/' },
+                    { label: 'About', href: '/about' },
+                    { label: 'Services', href: '/services' },
+                    { label: 'Contact', href: '/contact' },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      };
+      responseContent = JSON.stringify(websiteData, null, 2);
     } else if (toolCalls.length > 0) {
       const toolNames = toolCalls.map((t) => t.toolName).join(', ');
       responseContent = `I have inspected your request and identified that we should retrieve information using the following workspace tools: **${toolNames}**. Executing tools within your verified workspace security perimeter...`;

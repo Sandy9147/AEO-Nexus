@@ -132,6 +132,8 @@ model User {
   recordedGoalProgress      GoalProgressRecord[]      @relation("GoalProgressRecorder")
   ownedInitiatives          StrategicInitiative[]     @relation("InitiativeOwner")
   conductedStrategyReviews  StrategyReview[]          @relation("ReviewConductor")
+  createdWebsites           WebsiteProject[]          @relation("WebsiteCreator")
+  publishedWebsites         WebsitePublication[]      @relation("WebsitePublisher")
 
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
@@ -227,6 +229,7 @@ model Workspace {
   roadmapMilestones     RoadmapMilestone[]
   strategyReviews       StrategyReview[]
   planningRecommendations PlanningRecommendation[]
+  websiteProjects       WebsiteProject[]
 
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -1171,6 +1174,7 @@ model StrategicPlan {
   roadmaps               StrategicRoadmap[]
   reviews                StrategyReview[]
   recommendations        PlanningRecommendation[]
+  websites               WebsiteProject[]
 
   createdAt              DateTime                 @default(now()) @map("created_at")
   updatedAt              DateTime                 @updatedAt @map("updated_at")
@@ -1289,6 +1293,7 @@ model StrategicInitiative {
 
   outgoingDependencies InitiativeDependency[] @relation("InitiativeOutgoing")
   incomingDependencies InitiativeDependency[] @relation("InitiativeIncoming")
+  websites             WebsiteProject[]
 
   createdAt          DateTime                @default(now()) @map("created_at")
   updatedAt          DateTime                @updatedAt @map("updated_at")
@@ -1439,4 +1444,179 @@ model PlanningRecommendation {
   @@index([planId])
   @@index([isActioned])
   @@map("planning_recommendations")
+}
+
+// ==============================================================================
+// Phase 6C: Build — AI Website & Landing Page Builder Engine
+// ==============================================================================
+
+enum WebsiteStatus {
+  DRAFT
+  GENERATING
+  READY
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SectionType {
+  HERO
+  ANNOUNCEMENT_BAR
+  NAVIGATION
+  LOGO_STRIP
+  FEATURES
+  SERVICES
+  ABOUT
+  IMAGE_TEXT
+  GALLERY
+  PROCESS_STEPS
+  PRICING
+  FAQ
+  TESTIMONIALS
+  CONTACT
+  CTA
+  FOOTER
+}
+
+model WebsiteProject {
+  id                   String                 @id @default(uuid())
+  workspaceId          String                 @map("workspace_id")
+  createdById          String                 @map("created_by_id")
+  name                 String
+  slug                 String                 @unique
+  websiteType          String                 @default("BUSINESS_WEBSITE") @map("website_type")
+  status               WebsiteStatus          @default(DRAFT)
+  description          String?
+  targetAudience       String?                @map("target_audience")
+  targetMarket         String?                @map("target_market")
+  planId               String?                @map("plan_id")
+  initiativeId         String?                @map("initiative_id")
+  currentVersionNumber Int                    @default(1) @map("current_version_number")
+  publishedSubdomain   String?                @unique @map("published_subdomain")
+  isPublished          Boolean                @default(false) @map("is_published")
+  publishedAt          DateTime?              @map("published_at")
+
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy            User                   @relation("WebsiteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  plan                 StrategicPlan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
+  initiative           StrategicInitiative?   @relation(fields: [initiativeId], references: [id], onDelete: SetNull)
+
+  theme                WebsiteTheme?
+  pages                WebsitePage[]
+  versions             WebsiteVersion[]
+  publications         WebsitePublication[]
+  generationRuns       WebsiteGenerationRun[]
+
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([createdById])
+  @@index([status])
+  @@index([planId])
+  @@index([initiativeId])
+  @@map("website_projects")
+}
+
+model WebsiteTheme {
+  id              String         @id @default(uuid())
+  websiteId       String         @unique @map("website_id")
+  primaryColor    String         @default("#3563F6") @map("primary_color")
+  secondaryColor  String         @default("#6554E8") @map("secondary_color")
+  backgroundColor String         @default("#FFFFFF") @map("background_color")
+  surfaceColor    String         @default("#F7F9FC") @map("surface_color")
+  textColor       String         @default("#1E293B") @map("text_color")
+  headingFont     String         @default("Inter") @map("heading_font")
+  bodyFont        String         @default("Inter") @map("body_font")
+  buttonStyle     String         @default("ROUNDED") @map("button_style")
+  borderRadius    String         @default("8px") @map("border_radius")
+  sectionSpacing  String         @default("MEDIUM") @map("section_spacing")
+
+  website         WebsiteProject @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@map("website_themes")
+}
+
+model WebsitePage {
+  id             String         @id @default(uuid())
+  websiteId      String         @map("website_id")
+  title          String
+  slug           String
+  pageOrder      Int            @default(0) @map("page_order")
+  isHome         Boolean        @default(false) @map("is_home")
+  seoTitle       String?        @map("seo_title")
+  seoDescription String?        @map("seo_description")
+  sections       Json
+
+  website        WebsiteProject @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@unique([websiteId, slug])
+  @@index([websiteId])
+  @@map("website_pages")
+}
+
+model WebsiteVersion {
+  id            String               @id @default(uuid())
+  websiteId     String               @map("website_id")
+  versionNumber Int                  @map("version_number")
+  title         String
+  snapshot      Json
+  changeSummary String?              @map("change_summary")
+  createdById   String               @map("created_by_id")
+
+  website       WebsiteProject       @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  publications  WebsitePublication[]
+
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  @@unique([websiteId, versionNumber])
+  @@index([websiteId])
+  @@map("website_versions")
+}
+
+model WebsitePublication {
+  id            String         @id @default(uuid())
+  websiteId     String         @map("website_id")
+  versionId     String         @map("version_id")
+  subdomain     String
+  publishedUrl  String         @map("published_url")
+  publishedById String         @map("published_by_id")
+  status        String         @default("ACTIVE")
+  publishedAt   DateTime       @default(now()) @map("published_at")
+  unpublishedAt DateTime?      @map("unpublished_at")
+
+  website       WebsiteProject @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  version       WebsiteVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  publishedBy   User           @relation("WebsitePublisher", fields: [publishedById], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([subdomain])
+  @@map("website_publications")
+}
+
+model WebsiteGenerationRun {
+  id               String         @id @default(uuid())
+  websiteId        String         @map("website_id")
+  status           String         @default("PENDING")
+  provider         String
+  model            String
+  prompt           String?
+  rawResponse      String?        @map("raw_response")
+  error            String?
+  promptTokens     Int            @default(0) @map("prompt_tokens")
+  completionTokens Int            @default(0) @map("completion_tokens")
+  totalTokens      Int            @default(0) @map("total_tokens")
+  latencyMs        Int            @default(0) @map("latency_ms")
+
+  website          WebsiteProject @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  @@index([websiteId])
+  @@map("website_generation_runs")
 }

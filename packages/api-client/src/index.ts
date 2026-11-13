@@ -111,6 +111,23 @@ import {
   CreateStrategyReviewRequest,
   PlanningRecommendationDto,
   PlanningOverviewDto,
+  WebsiteProjectDto,
+  WebsiteDetailDto,
+  WebsiteThemeDto,
+  WebsitePageDto,
+  WebsiteVersionDto,
+  WebsitePublicationDto,
+  BuildOverviewDto,
+  CreateWebsiteProjectRequest,
+  GenerateWebsiteRequest,
+  UpdateWebsiteProjectRequest,
+  UpdateWebsiteThemeRequest,
+  CreateWebsitePageRequest,
+  UpdateWebsitePageRequest,
+  SavePageSectionsRequest,
+  RegenerateSectionRequest,
+  PublishWebsiteRequest,
+  PublicWebsiteDto,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -1303,5 +1320,178 @@ export class AeoNexusApiClient {
         method: 'POST',
       },
     );
+  }
+
+  // ==============================================================================
+  // Phase 6C: Build — AI Website & Landing Page Builder
+  // ==============================================================================
+
+  async getBuildOverview(workspaceId: string): Promise<BuildOverviewDto> {
+    return this.request<BuildOverviewDto>(`/workspaces/${workspaceId}/build/overview`);
+  }
+
+  async listWebsites(
+    workspaceId: string,
+    params?: { status?: string; search?: string },
+  ): Promise<WebsiteProjectDto[]> {
+    const qs = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') qs.set('status', params.status);
+    if (params?.search) qs.set('search', params.search);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<WebsiteProjectDto[]>(`/workspaces/${workspaceId}/build/websites${queryString}`);
+  }
+
+  async createWebsite(
+    workspaceId: string,
+    payload: CreateWebsiteProjectRequest,
+  ): Promise<WebsiteProjectDto> {
+    return this.request<WebsiteProjectDto>(`/workspaces/${workspaceId}/build/websites`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async generateWebsite(
+    workspaceId: string,
+    payload: GenerateWebsiteRequest,
+  ): Promise<WebsiteProjectDto> {
+    return this.request<WebsiteProjectDto>(`/workspaces/${workspaceId}/build/websites/generate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getWebsite(workspaceId: string, websiteId: string): Promise<WebsiteDetailDto> {
+    return this.request<WebsiteDetailDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}`);
+  }
+
+  async updateWebsite(
+    workspaceId: string,
+    websiteId: string,
+    payload: UpdateWebsiteProjectRequest,
+  ): Promise<WebsiteProjectDto> {
+    return this.request<WebsiteProjectDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteWebsite(workspaceId: string, websiteId: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/build/websites/${websiteId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateWebsiteTheme(
+    workspaceId: string,
+    websiteId: string,
+    payload: UpdateWebsiteThemeRequest,
+  ): Promise<WebsiteThemeDto> {
+    return this.request<WebsiteThemeDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/theme`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createWebsitePage(
+    workspaceId: string,
+    websiteId: string,
+    payload: CreateWebsitePageRequest,
+  ): Promise<WebsitePageDto> {
+    return this.request<WebsitePageDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/pages`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async updateWebsitePage(
+    workspaceId: string,
+    websiteId: string,
+    pageId: string,
+    payload: UpdateWebsitePageRequest,
+  ): Promise<WebsitePageDto> {
+    return this.request<WebsitePageDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/pages/${pageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteWebsitePage(
+    workspaceId: string,
+    websiteId: string,
+    pageId: string,
+  ): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/build/websites/${websiteId}/pages/${pageId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async savePageSections(
+    workspaceId: string,
+    websiteId: string,
+    pageId: string,
+    payload: SavePageSectionsRequest,
+  ): Promise<WebsitePageDto> {
+    return this.request<WebsitePageDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/pages/${pageId}/sections`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async regenerateSection(
+    workspaceId: string,
+    websiteId: string,
+    pageId: string,
+    payload: RegenerateSectionRequest,
+  ): Promise<{ section: any }> {
+    return this.request<{ section: any }>(`/workspaces/${workspaceId}/build/websites/${websiteId}/pages/${pageId}/regenerate-section`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createWebsiteVersion(
+    workspaceId: string,
+    websiteId: string,
+    payload: { title: string; changeSummary?: string },
+  ): Promise<WebsiteVersionDto> {
+    return this.request<WebsiteVersionDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/versions`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async restoreWebsiteVersion(
+    workspaceId: string,
+    websiteId: string,
+    versionId: string,
+  ): Promise<WebsiteDetailDto> {
+    return this.request<WebsiteDetailDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/versions/${versionId}/restore`, {
+      method: 'POST',
+    });
+  }
+
+  async publishWebsite(
+    workspaceId: string,
+    websiteId: string,
+    payload: PublishWebsiteRequest,
+  ): Promise<WebsitePublicationDto> {
+    return this.request<WebsitePublicationDto>(`/workspaces/${workspaceId}/build/websites/${websiteId}/publish`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async unpublishWebsite(
+    workspaceId: string,
+    websiteId: string,
+  ): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/workspaces/${workspaceId}/build/websites/${websiteId}/unpublish`, {
+      method: 'POST',
+    });
+  }
+
+  async getPublicWebsite(subdomain: string): Promise<PublicWebsiteDto> {
+    return this.request<PublicWebsiteDto>(`/public/websites/${subdomain}`);
   }
 }

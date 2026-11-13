@@ -1826,3 +1826,260 @@ export interface PlanningOverviewDto {
 }
 
 
+
+// ==============================================================================
+// 12. Phase 6C: Build — AI Website & Landing Page Builder Contracts
+// ==============================================================================
+
+export const WebsiteStatusEnum = z.enum([
+  'DRAFT',
+  'GENERATING',
+  'READY',
+  'PUBLISHED',
+  'ARCHIVED',
+]);
+export type WebsiteStatus = z.infer<typeof WebsiteStatusEnum>;
+
+export const SectionTypeEnum = z.enum([
+  'HERO',
+  'ANNOUNCEMENT_BAR',
+  'NAVIGATION',
+  'LOGO_STRIP',
+  'FEATURES',
+  'SERVICES',
+  'ABOUT',
+  'IMAGE_TEXT',
+  'GALLERY',
+  'PROCESS_STEPS',
+  'PRICING',
+  'FAQ',
+  'TESTIMONIALS',
+  'CONTACT',
+  'CTA',
+  'FOOTER',
+]);
+export type SectionType = z.infer<typeof SectionTypeEnum>;
+
+export const RESERVED_SUBDOMAINS = [
+  'api',
+  'admin',
+  'www',
+  'app',
+  'login',
+  'mail',
+  'auth',
+  'public',
+  'sites',
+  'dashboard',
+  'support',
+  'status',
+  'billing',
+  'root',
+  'staging',
+  'test',
+];
+
+export const SubdomainSchema = z
+  .string()
+  .min(3, 'Subdomain must be at least 3 characters')
+  .max(63, 'Subdomain cannot exceed 63 characters')
+  .regex(/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/, 'Subdomain must contain only lowercase alphanumeric characters and hyphens, and cannot start or end with a hyphen')
+  .refine((val) => !RESERVED_SUBDOMAINS.includes(val.toLowerCase()), {
+    message: 'This subdomain is reserved by the platform',
+  });
+
+export const CreateWebsiteProjectSchema = z.object({
+  name: z.string().min(2, 'Website name must be at least 2 characters').max(100),
+  websiteType: z.string().default('BUSINESS_WEBSITE'),
+  description: z.string().max(2000).optional(),
+  targetAudience: z.string().max(500).optional(),
+  targetMarket: z.string().max(500).optional(),
+  planId: z.string().uuid().optional(),
+  initiativeId: z.string().uuid().optional(),
+});
+export type CreateWebsiteProjectRequest = z.infer<typeof CreateWebsiteProjectSchema>;
+
+export const GenerateWebsiteSchema = z.object({
+  name: z.string().min(2).max(100),
+  websiteType: z.string().default('BUSINESS_WEBSITE'),
+  businessDescription: z.string().max(3000).optional(),
+  targetAudience: z.string().max(500).optional(),
+  targetMarket: z.string().max(500).optional(),
+  websitePurpose: z.string().max(500).optional(),
+  requiredPages: z.array(z.string()).default(['/', '/about', '/services', '/contact']),
+  brandColors: z
+    .object({
+      primary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      secondary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    })
+    .optional(),
+  planId: z.string().uuid().optional(),
+  initiativeId: z.string().uuid().optional(),
+  additionalInstructions: z.string().max(2000).optional(),
+});
+export type GenerateWebsiteRequest = z.infer<typeof GenerateWebsiteSchema>;
+
+export const UpdateWebsiteProjectSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  websiteType: z.string().optional(),
+  description: z.string().max(2000).optional().nullable(),
+  targetAudience: z.string().max(500).optional().nullable(),
+  targetMarket: z.string().max(500).optional().nullable(),
+  status: WebsiteStatusEnum.optional(),
+});
+export type UpdateWebsiteProjectRequest = z.infer<typeof UpdateWebsiteProjectSchema>;
+
+export const UpdateWebsiteThemeSchema = z.object({
+  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  surfaceColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  textColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  headingFont: z.string().max(50).optional(),
+  bodyFont: z.string().max(50).optional(),
+  buttonStyle: z.enum(['ROUNDED', 'PILL', 'SQUARE']).optional(),
+  borderRadius: z.string().max(20).optional(),
+  sectionSpacing: z.enum(['COMPACT', 'MEDIUM', 'RELAXED']).optional(),
+});
+export type UpdateWebsiteThemeRequest = z.infer<typeof UpdateWebsiteThemeSchema>;
+
+export const CreateWebsitePageSchema = z.object({
+  title: z.string().min(1).max(100),
+  slug: z.string().min(1).max(100).regex(/^\/?[a-z0-9\-_/]*$/, 'Invalid page slug format'),
+  pageOrder: z.number().int().default(0),
+  isHome: z.boolean().default(false),
+  seoTitle: z.string().max(150).optional(),
+  seoDescription: z.string().max(300).optional(),
+  sections: z.array(z.any()).default([]),
+});
+export type CreateWebsitePageRequest = z.infer<typeof CreateWebsitePageSchema>;
+
+export const UpdateWebsitePageSchema = CreateWebsitePageSchema.partial();
+export type UpdateWebsitePageRequest = z.infer<typeof UpdateWebsitePageSchema>;
+
+export const SavePageSectionsSchema = z.object({
+  sections: z.array(z.any()),
+});
+export type SavePageSectionsRequest = z.infer<typeof SavePageSectionsSchema>;
+
+export const RegenerateSectionSchema = z.object({
+  sectionType: SectionTypeEnum,
+  prompt: z.string().max(1000).optional(),
+});
+export type RegenerateSectionRequest = z.infer<typeof RegenerateSectionSchema>;
+
+export const PublishWebsiteSchema = z.object({
+  subdomain: SubdomainSchema,
+});
+export type PublishWebsiteRequest = z.infer<typeof PublishWebsiteSchema>;
+
+// DTO Interfaces
+export interface WebsiteThemeDto {
+  id: string;
+  websiteId: string;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  surfaceColor: string;
+  textColor: string;
+  headingFont: string;
+  bodyFont: string;
+  buttonStyle: string;
+  borderRadius: string;
+  sectionSpacing: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebsitePageDto {
+  id: string;
+  websiteId: string;
+  title: string;
+  slug: string;
+  pageOrder: number;
+  isHome: boolean;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  sections: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebsiteVersionDto {
+  id: string;
+  websiteId: string;
+  versionNumber: number;
+  title: string;
+  snapshot: any;
+  changeSummary: string | null;
+  createdById: string;
+  createdAt: string;
+}
+
+export interface WebsitePublicationDto {
+  id: string;
+  websiteId: string;
+  versionId: string;
+  subdomain: string;
+  publishedUrl: string;
+  publishedById: string;
+  status: string;
+  publishedAt: string;
+  unpublishedAt: string | null;
+}
+
+export interface WebsiteProjectDto {
+  id: string;
+  workspaceId: string;
+  createdById: string;
+  name: string;
+  slug: string;
+  websiteType: string;
+  status: WebsiteStatus;
+  description: string | null;
+  targetAudience: string | null;
+  targetMarket: string | null;
+  planId: string | null;
+  initiativeId: string | null;
+  currentVersionNumber: number;
+  publishedSubdomain: string | null;
+  isPublished: boolean;
+  publishedAt: string | null;
+  pagesCount?: number;
+  theme?: WebsiteThemeDto;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WebsiteDetailDto extends WebsiteProjectDto {
+  theme: WebsiteThemeDto;
+  pages: WebsitePageDto[];
+  versions: WebsiteVersionDto[];
+  publications: WebsitePublicationDto[];
+}
+
+export interface BuildOverviewDto {
+  totalWebsites: number;
+  publishedWebsites: number;
+  draftWebsites: number;
+  websites: WebsiteProjectDto[];
+  recentPublications: WebsitePublicationDto[];
+}
+
+export interface PublicWebsiteDto {
+  name: string;
+  slug: string;
+  subdomain: string;
+  publishedUrl: string;
+  publishedAt: string;
+  theme: WebsiteThemeDto;
+  pages: Array<{
+    title: string;
+    slug: string;
+    isHome: boolean;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    sections: any[];
+  }>;
+}
