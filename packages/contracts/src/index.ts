@@ -213,3 +213,171 @@ export interface WorkspaceDetail {
   createdAt: string;
   updatedAt: string;
 }
+
+// ==============================================================================
+// 5. Business Profile & Context Contracts
+// ==============================================================================
+
+export const SaveBusinessProfileSchema = z.object({
+  businessName: z.string().min(2, 'Business name must be at least 2 characters').max(120),
+  website: z.string().url('Must be a valid URL').or(z.literal('')).optional().nullable(),
+  industry: z.string().min(2, 'Industry is required'),
+  country: z.string().min(2, 'Country is required'),
+  businessSize: z.string().min(1, 'Business size is required'),
+  description: z.string().max(1000).optional().nullable(),
+});
+export type SaveBusinessProfileRequest = z.infer<typeof SaveBusinessProfileSchema>;
+
+export interface BusinessProfileDto {
+  id: string;
+  workspaceId: string;
+  businessName: string;
+  website?: string | null;
+  industry: string;
+  country: string;
+  businessSize: string;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==============================================================================
+// 6. Brand Profile Contracts
+// ==============================================================================
+
+export const SaveBrandProfileSchema = z.object({
+  logoUrl: z.string().optional().nullable(),
+  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color').optional(),
+  brandVoice: z.string().optional().nullable(),
+  description: z.string().max(1000).optional().nullable(),
+});
+export type SaveBrandProfileRequest = z.infer<typeof SaveBrandProfileSchema>;
+
+export interface BrandProfileDto {
+  id: string;
+  workspaceId: string;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  brandVoice?: string | null;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==============================================================================
+// 7. Onboarding Progress Contracts
+// ==============================================================================
+
+export const SaveOnboardingStepSchema = z.object({
+  step: z.enum(['business', 'goals', 'brand', 'complete']),
+  goals: z.array(z.string()).optional(),
+  data: z.record(z.any()).optional(),
+});
+export type SaveOnboardingStepRequest = z.infer<typeof SaveOnboardingStepSchema>;
+
+export interface OnboardingProgressDto {
+  id: string;
+  workspaceId: string;
+  step: string;
+  completed: boolean;
+  completedSteps: string[];
+  goals: string[];
+  data?: Record<string, any> | null;
+  updatedAt: string;
+}
+
+// ==============================================================================
+// 8. Workspace Preferences Contracts
+// ==============================================================================
+
+export const UpdateWorkspacePreferenceSchema = z.object({
+  timezone: z.string().min(1).optional(),
+  currency: z.string().min(1).optional(),
+  emailNotifications: z.boolean().optional(),
+  weeklyDigest: z.boolean().optional(),
+  marketingUpdates: z.boolean().optional(),
+});
+export type UpdateWorkspacePreferenceRequest = z.infer<typeof UpdateWorkspacePreferenceSchema>;
+
+export interface WorkspacePreferenceDto {
+  id: string;
+  workspaceId: string;
+  timezone: string;
+  currency: string;
+  emailNotifications: boolean;
+  weeklyDigest: boolean;
+  marketingUpdates: boolean;
+  updatedAt: string;
+}
+
+// ==============================================================================
+// 9. Dashboard & Application Catalog Contracts
+// ==============================================================================
+
+export interface DashboardChecklistItem {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+  href: string;
+}
+
+export interface DashboardActivityItem {
+  id: string;
+  action: string;
+  resource: string;
+  timestamp: string;
+}
+
+export interface DashboardToolItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  href: string;
+  icon: string;
+  status: 'functional' | 'coming-soon';
+}
+
+export interface DashboardSummaryDto {
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+    role: string;
+  };
+  profileCompletion: number;
+  businessProfile?: BusinessProfileDto | null;
+  brandProfile?: BrandProfileDto | null;
+  onboardingCompleted: boolean;
+  checklist: DashboardChecklistItem[];
+  recentActivity: DashboardActivityItem[];
+  recentTools: DashboardToolItem[];
+  projectsCount: number;
+}
+
+export type AppCategory =
+  | 'All'
+  | 'Marketing'
+  | 'Operations'
+  | 'AI & Automation'
+  | 'Content'
+  | 'Analytics'
+  | 'Commerce';
+
+export interface AppCatalogItemDto {
+  id: string;
+  slug: string;
+  name: string;
+  category: 'Marketing' | 'Operations' | 'AI & Automation' | 'Content' | 'Analytics' | 'Commerce';
+  badge?: string;
+  description: string;
+  longDescription: string;
+  status: 'functional' | 'coming-soon' | 'beta';
+  icon: string;
+  features: string[];
+  launchUrl?: string;
+}
+

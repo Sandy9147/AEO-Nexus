@@ -122,9 +122,13 @@ model Workspace {
   slug        String        @unique
   isActive    Boolean       @default(true) @map("is_active")
 
-  members     WorkspaceMember[]
-  invitations WorkspaceInvitation[]
-  auditLogs   AuditLog[]
+  members            WorkspaceMember[]
+  invitations        WorkspaceInvitation[]
+  auditLogs          AuditLog[]
+  businessProfile    BusinessProfile?
+  brandProfile       BrandProfile?
+  onboardingProgress OnboardingProgress?
+  preferences        WorkspacePreference?
 
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -188,4 +192,77 @@ model AuditLog {
   @@index([workspaceId])
   @@index([userId])
   @@map("audit_logs")
+}
+
+model BusinessProfile {
+  id           String    @id @default(uuid())
+  workspaceId  String    @unique @map("workspace_id")
+  businessName String    @map("business_name")
+  website      String?
+  industry     String
+  country      String
+  businessSize String    @map("business_size")
+  description  String?
+
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("business_profiles")
+}
+
+model BrandProfile {
+  id             String    @id @default(uuid())
+  workspaceId    String    @unique @map("workspace_id")
+  logoUrl        String?   @map("logo_url")
+  primaryColor   String?   @default("#3563F6") @map("primary_color")
+  secondaryColor String?   @default("#6554E8") @map("secondary_color")
+  brandVoice     String?   @map("brand_voice")
+  description    String?
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("brand_profiles")
+}
+
+model OnboardingProgress {
+  id             String    @id @default(uuid())
+  workspaceId    String    @unique @map("workspace_id")
+  step           String    @default("business")
+  completed      Boolean   @default(false)
+  completedSteps Json?     @map("completed_steps")
+  goals          Json?
+  data           Json?
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("onboarding_progress")
+}
+
+model WorkspacePreference {
+  id                 String    @id @default(uuid())
+  workspaceId        String    @unique @map("workspace_id")
+  timezone           String    @default("UTC")
+  currency           String    @default("USD")
+  emailNotifications Boolean   @default(true) @map("email_notifications")
+  weeklyDigest       Boolean   @default(true) @map("weekly_digest")
+  marketingUpdates   Boolean   @default(false) @map("marketing_updates")
+
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@map("workspace_preferences")
 }

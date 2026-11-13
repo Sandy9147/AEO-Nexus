@@ -13,6 +13,16 @@ import {
   UpdateMemberRoleRequest,
   UpdateWorkspaceRequest,
   CreateWorkspaceRequest,
+  SaveBusinessProfileRequest,
+  BusinessProfileDto,
+  SaveBrandProfileRequest,
+  BrandProfileDto,
+  SaveOnboardingStepRequest,
+  OnboardingProgressDto,
+  UpdateWorkspacePreferenceRequest,
+  WorkspacePreferenceDto,
+  DashboardSummaryDto,
+  AppCatalogItemDto,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -255,5 +265,89 @@ export class AeoNexusApiClient {
         method: 'DELETE',
       },
     );
+  }
+
+  // Business Profile
+  async getBusinessProfile(workspaceId: string): Promise<BusinessProfileDto | null> {
+    return this.request<BusinessProfileDto | null>(`/workspaces/${workspaceId}/business-profile`);
+  }
+
+  async saveBusinessProfile(
+    workspaceId: string,
+    payload: SaveBusinessProfileRequest,
+  ): Promise<BusinessProfileDto> {
+    return this.request<BusinessProfileDto>(`/workspaces/${workspaceId}/business-profile`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Brand Profile
+  async getBrandProfile(workspaceId: string): Promise<BrandProfileDto | null> {
+    return this.request<BrandProfileDto | null>(`/workspaces/${workspaceId}/brand-profile`);
+  }
+
+  async saveBrandProfile(
+    workspaceId: string,
+    payload: SaveBrandProfileRequest,
+  ): Promise<BrandProfileDto> {
+    return this.request<BrandProfileDto>(`/workspaces/${workspaceId}/brand-profile`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Onboarding
+  async getOnboardingProgress(workspaceId: string): Promise<OnboardingProgressDto | null> {
+    return this.request<OnboardingProgressDto | null>(`/workspaces/${workspaceId}/onboarding`);
+  }
+
+  async saveOnboardingStep(
+    workspaceId: string,
+    payload: SaveOnboardingStepRequest,
+  ): Promise<OnboardingProgressDto> {
+    return this.request<OnboardingProgressDto>(`/workspaces/${workspaceId}/onboarding/step`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async completeOnboarding(workspaceId: string): Promise<{ completed: boolean }> {
+    return this.request<{ completed: boolean }>(`/workspaces/${workspaceId}/onboarding/complete`, {
+      method: 'POST',
+    });
+  }
+
+  // Preferences
+  async getWorkspacePreferences(workspaceId: string): Promise<WorkspacePreferenceDto> {
+    return this.request<WorkspacePreferenceDto>(`/workspaces/${workspaceId}/preferences`);
+  }
+
+  async updateWorkspacePreferences(
+    workspaceId: string,
+    payload: UpdateWorkspacePreferenceRequest,
+  ): Promise<WorkspacePreferenceDto> {
+    return this.request<WorkspacePreferenceDto>(`/workspaces/${workspaceId}/preferences`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Dashboard
+  async getDashboardSummary(workspaceId: string): Promise<DashboardSummaryDto> {
+    return this.request<DashboardSummaryDto>(`/workspaces/${workspaceId}/dashboard-summary`);
+  }
+
+  // Application Catalog
+  async getAppsCatalog(category?: string, query?: string): Promise<AppCatalogItemDto[]> {
+    const params = new URLSearchParams();
+    if (category && category !== 'All') params.set('category', category);
+    if (query) params.set('q', query);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return this.request<AppCatalogItemDto[]>(`/apps/catalog${qs}`);
+  }
+
+  async getAppBySlug(slug: string): Promise<AppCatalogItemDto> {
+    return this.request<AppCatalogItemDto>(`/apps/catalog/${slug}`);
   }
 }

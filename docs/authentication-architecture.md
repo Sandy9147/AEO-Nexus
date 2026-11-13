@@ -168,3 +168,4 @@ AEO Nexus cleanly decouples **Platform Roles**, **Workspace Roles**, and **Agenc
 4. **Email Delivery Safety:**
    - Supports production providers (SMTP / Resend).
    - In local development without configured SMTP credentials, emails are written to a secure backend debug stream without attempting external connections or using mocks.
+
