@@ -8,21 +8,30 @@
 
 // 1. Platform-level Roles (Administrative Control Plane)
 export enum PlatformRole {
-  SUPERADMIN = 'SUPERADMIN',
+  PLATFORM_SUPER_ADMIN = 'PLATFORM_SUPER_ADMIN',
   PLATFORM_ADMIN = 'PLATFORM_ADMIN',
-  PLATFORM_SUPPORT = 'PLATFORM_SUPPORT',
+  SUPPORT_AGENT = 'SUPPORT_AGENT',
+  BILLING_OPERATOR = 'BILLING_OPERATOR',
 }
 
-// 2. Workspace-level Roles (Customer Data Plane / Agency Tenancy)
+// 2. Workspace-level Roles (Customer Data Plane / Tenancy)
 export enum WorkspaceRole {
   WORKSPACE_OWNER = 'WORKSPACE_OWNER',
   WORKSPACE_ADMIN = 'WORKSPACE_ADMIN',
-  AGENCY_MANAGER = 'AGENCY_MANAGER',
-  WORKSPACE_MEMBER = 'WORKSPACE_MEMBER',
-  WORKSPACE_VIEWER = 'WORKSPACE_VIEWER',
+  WORKSPACE_MANAGER = 'WORKSPACE_MANAGER',
+  EDITOR = 'EDITOR',
+  VIEWER = 'VIEWER',
 }
 
-// 3. Platform Administration Permissions
+// 3. Agency-level Roles (Separately Scoped Partner Tenancy)
+export enum AgencyRole {
+  AGENCY_OWNER = 'AGENCY_OWNER',
+  AGENCY_ADMIN = 'AGENCY_ADMIN',
+  AGENCY_OPERATOR = 'AGENCY_OPERATOR',
+  AGENCY_VIEWER = 'AGENCY_VIEWER',
+}
+
+// 4. Platform Administration Permissions
 export enum PlatformPermission {
   TENANT_CREATE = 'platform:tenant:create',
   TENANT_READ = 'platform:tenant:read',
@@ -31,9 +40,10 @@ export enum PlatformPermission {
   PLATFORM_SETTINGS_MANAGE = 'platform:settings:manage',
   GLOBAL_AUDIT_LOG_VIEW = 'platform:audit:view',
   SYSTEM_METRICS_VIEW = 'platform:metrics:view',
+  BILLING_MANAGE = 'platform:billing:manage',
 }
 
-// 4. Workspace Permissions (Isolated per tenant)
+// 5. Workspace Permissions (Isolated per tenant)
 export enum WorkspacePermission {
   WORKSPACE_SETTINGS_MANAGE = 'workspace:settings:manage',
   WORKSPACE_MEMBERS_MANAGE = 'workspace:members:manage',
@@ -50,7 +60,7 @@ export enum WorkspacePermission {
 
 // Role-to-Permissions Maps
 export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, PlatformPermission[]> = {
-  [PlatformRole.SUPERADMIN]: Object.values(PlatformPermission),
+  [PlatformRole.PLATFORM_SUPER_ADMIN]: Object.values(PlatformPermission),
   [PlatformRole.PLATFORM_ADMIN]: [
     PlatformPermission.TENANT_CREATE,
     PlatformPermission.TENANT_READ,
@@ -58,9 +68,13 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<PlatformRole, PlatformPermission[
     PlatformPermission.GLOBAL_AUDIT_LOG_VIEW,
     PlatformPermission.SYSTEM_METRICS_VIEW,
   ],
-  [PlatformRole.PLATFORM_SUPPORT]: [
+  [PlatformRole.SUPPORT_AGENT]: [
     PlatformPermission.TENANT_READ,
     PlatformPermission.SYSTEM_METRICS_VIEW,
+  ],
+  [PlatformRole.BILLING_OPERATOR]: [
+    PlatformPermission.TENANT_READ,
+    PlatformPermission.BILLING_MANAGE,
   ],
 };
 
@@ -77,7 +91,7 @@ export const WORKSPACE_ROLE_PERMISSIONS: Record<WorkspaceRole, WorkspacePermissi
     WorkspacePermission.AI_AGENT_EXECUTE,
     WorkspacePermission.ANALYTICS_VIEW,
   ],
-  [WorkspaceRole.AGENCY_MANAGER]: [
+  [WorkspaceRole.WORKSPACE_MANAGER]: [
     WorkspacePermission.WORKSPACE_MEMBERS_INVITE,
     WorkspacePermission.WORKFLOW_CREATE,
     WorkspacePermission.WORKFLOW_EXECUTE,
@@ -85,13 +99,13 @@ export const WORKSPACE_ROLE_PERMISSIONS: Record<WorkspaceRole, WorkspacePermissi
     WorkspacePermission.AI_AGENT_EXECUTE,
     WorkspacePermission.ANALYTICS_VIEW,
   ],
-  [WorkspaceRole.WORKSPACE_MEMBER]: [
+  [WorkspaceRole.EDITOR]: [
     WorkspacePermission.WORKFLOW_READ,
     WorkspacePermission.WORKFLOW_EXECUTE,
     WorkspacePermission.AI_AGENT_EXECUTE,
     WorkspacePermission.ANALYTICS_VIEW,
   ],
-  [WorkspaceRole.WORKSPACE_VIEWER]: [
+  [WorkspaceRole.VIEWER]: [
     WorkspacePermission.WORKFLOW_READ,
     WorkspacePermission.ANALYTICS_VIEW,
   ],

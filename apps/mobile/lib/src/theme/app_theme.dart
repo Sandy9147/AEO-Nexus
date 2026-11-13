@@ -38,7 +38,7 @@ class AeoNexusTheme {
           fontFamily: 'Inter',
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AeoNexusColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(

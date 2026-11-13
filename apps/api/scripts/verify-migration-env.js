@@ -44,7 +44,9 @@ const databaseUrl = process.env.DATABASE_URL;
 // 1. Mandatory DIRECT_URL check
 if (!directUrl || directUrl.trim() === '') {
   console.error('\n❌ [Prisma Migration Pre-flight Error]');
-  console.error('DIRECT_URL is mandatory for Prisma migrations against Neon PostgreSQL.');
+  console.error(
+    'DIRECT_URL is mandatory for Prisma migrations against Neon PostgreSQL.',
+  );
   console.error(
     'Please set DIRECT_URL to your Neon direct (non-pooled) connection string in .env.\n',
   );
@@ -71,7 +73,9 @@ if (nodeEnv === 'production' || nodeEnv === 'staging') {
     databaseUrl.includes('localhost');
 
   if (isDirectPlaceholder || isDatabasePlaceholder) {
-    console.error(`\n❌ [Prisma Migration Safety Gate - Environment: ${nodeEnv.toUpperCase()}]`);
+    console.error(
+      `\n❌ [Prisma Migration Safety Gate - Environment: ${nodeEnv.toUpperCase()}]`,
+    );
     console.error(
       'Execution blocked: Production and staging environments cannot use placeholder or development connection credentials.',
     );
