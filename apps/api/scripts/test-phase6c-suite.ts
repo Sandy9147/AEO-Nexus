@@ -340,6 +340,7 @@ async function runPhase6cSuite() {
         title: 'Solutions Portfolio',
         slug: '/solutions',
         pageOrder: 10,
+        isHome: false,
         seoTitle: 'Enterprise Solutions | Apex SaaS',
         seoDescription: 'Tailored solutions for modern marketing teams',
         sections: [

@@ -4,3 +4,4 @@ ADD COLUMN "mfa_secret" TEXT,
 ADD COLUMN "mfa_recovery_codes" TEXT[] DEFAULT ARRAY[]::TEXT[],
 ADD COLUMN "mfa_last_used_code" TEXT,
 ADD COLUMN "mfa_enrolled_at" TIMESTAMP(3);
+

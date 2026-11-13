@@ -1975,13 +1975,13 @@ export type UpdateWebsiteThemeRequest = z.infer<typeof UpdateWebsiteThemeSchema>
 export const CreateWebsitePageSchema = z.object({
   title: z.string().min(1).max(100),
   slug: z.string().min(1).max(100).regex(/^\/?[a-z0-9\-_/]*$/, 'Invalid page slug format'),
-  pageOrder: z.number().int().default(0),
-  isHome: z.boolean().default(false),
+  pageOrder: z.number().int().optional().default(0),
+  isHome: z.boolean().optional().default(false),
   seoTitle: z.string().max(150).optional(),
   seoDescription: z.string().max(300).optional(),
-  sections: z.array(z.any()).default([]),
+  sections: z.array(z.any()).optional().default([]),
 });
-export type CreateWebsitePageRequest = z.infer<typeof CreateWebsitePageSchema>;
+export type CreateWebsitePageRequest = z.input<typeof CreateWebsitePageSchema>;
 
 export const UpdateWebsitePageSchema = CreateWebsitePageSchema.partial();
 export type UpdateWebsitePageRequest = z.infer<typeof UpdateWebsitePageSchema>;

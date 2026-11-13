@@ -176,3 +176,4 @@ export class MfaService {
     return `otpauth://totp/${cleanIssuer}:${cleanEmail}?secret=${secret}&issuer=${cleanIssuer}&algorithm=SHA1&digits=6&period=30`;
   }
 }
+

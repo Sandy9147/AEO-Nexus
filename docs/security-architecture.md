@@ -109,3 +109,4 @@ The Express HTTP pipeline sets mandatory security headers:
 ### 6.3 DoS & Rate Limiting Protections
 - Express body parsing restricted to `10mb` to protect against payload memory exhaustion.
 - `RateLimiterGuard` active on sensitive authentication endpoints (`login`, `register`, `refresh`, `mfa/login`, `forgot-password`).
+
