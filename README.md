@@ -72,7 +72,8 @@ Design tokens and Tailwind configurations are centralized in `@aeo-nexus/ui`.
 
 - **Node.js**: >= 20.0.0
 - **pnpm**: >= 9.0.0
-- **Docker & Docker Compose**: For local PostgreSQL and Redis
+- **Neon Account**: Hosted serverless PostgreSQL database (https://neon.tech)
+- **Docker & Docker Compose**: For local Redis (BullMQ queue backend)
 - **Flutter SDK**: >= 3.16.0 (optional, for mobile app development)
 
 ### 1. Clone & Setup Environment
@@ -87,10 +88,17 @@ cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 ```
 
-### 2. Start Infrastructure Services (PostgreSQL & Redis)
+Configure your Neon connection strings in `.env` and `apps/api/.env`:
+
+- `DATABASE_URL`: Neon pooled connection string (with `-pooler` host & `?sslmode=require&pgbouncer=true`)
+- `DIRECT_URL`: Neon direct connection string (direct host & `?sslmode=require`)
+
+### 2. Start Background Queue Services (Redis)
+
+Local PostgreSQL is **not** required in Docker. Neon provides the hosted database. Only Redis is run locally for BullMQ:
 
 ```bash
-# Spin up PostgreSQL (port 5432) and Redis (port 6379)
+# Spin up Redis (port 6379)
 pnpm run docker:up
 
 # Check container health status
@@ -103,15 +111,46 @@ docker compose ps
 pnpm install
 ```
 
-### 4. Database Setup & Prisma Client Generation
+### 4. Database Setup & Prisma Migrations
+
+AEO Nexus uses **Prisma Migrations** for tracked, reproducible schema changes across environments:
 
 ```bash
-# Generate Prisma Client
-pnpm --filter @aeo-nexus/api run db:generate
+# Validate Prisma schema
+pnpm run db:validate
 
-# Push database schema to local PostgreSQL
-pnpm --filter @aeo-nexus/api run db:push
+# Generate Prisma Client
+pnpm run db:generate
+
+# Apply/create migrations for development branch
+pnpm run db:migrate
+
+# Apply migrations in CI / Staging / Production
+pnpm run db:deploy
+
+# Inspect migration status
+pnpm run db:status
 ```
+
+---
+
+## 🗄️ Neon Environment & Branching Strategy
+
+AEO Nexus utilizes Neon's database branching to maintain isolated environments:
+
+| Environment     | Neon Branch / Database                     | Connection URL Mode                             | Migration Command                              |
+| --------------- | ------------------------------------------ | ----------------------------------------------- | ---------------------------------------------- |
+| **Development** | `dev` or feature branch (e.g. `feat-auth`) | `DATABASE_URL` (Pooled) & `DIRECT_URL` (Direct) | `pnpm run db:migrate` (`prisma migrate dev`)   |
+| **Staging**     | `staging` branch                           | `DATABASE_URL` (Pooled) & `DIRECT_URL` (Direct) | `pnpm run db:deploy` (`prisma migrate deploy`) |
+| **Production**  | `main` branch (protected)                  | `DATABASE_URL` (Pooled) & `DIRECT_URL` (Direct) | `pnpm run db:deploy` (`prisma migrate deploy`) |
+
+> [!CAUTION]
+> **Strict Operational Rule**: Never execute development migrations (`prisma migrate dev`) directly against staging or production databases. Always validate migrations locally on a development branch before promoting schema changes using `prisma migrate deploy` in your CI/CD release pipeline.
+
+### Why Pooled vs. Direct Connections?
+
+- **Runtime Queries (`DATABASE_URL`)**: NextJS API routes and BullMQ workers connect through Neon's built-in connection pooler (PgBouncer). This prevents connection exhaustion under serverless and concurrent traffic.
+- **Prisma Migrations (`DIRECT_URL`)**: Prisma CLI migrations require features like advisory locks (`pg_advisory_lock`) and direct session variables that connection poolers in transaction mode do not support. `directUrl` instructs Prisma CLI to execute migrations through the direct compute endpoint.
 
 ### 5. Start Development Servers
 

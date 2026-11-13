@@ -116,7 +116,7 @@ export default function AdminWebPage() {
                 <CardTitle className="text-2xl font-bold text-[#3563F6]">24</CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-[#64748B]">
-                PostgreSQL 16 Pool Normal
+                Neon Serverless Pool Normal
               </CardContent>
             </Card>
           </div>

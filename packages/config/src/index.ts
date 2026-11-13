@@ -7,7 +7,12 @@ export const ApiConfigSchema = z.object({
   NODE_ENV: EnvironmentSchema.default('development'),
   PORT: z.coerce.number().default(4000),
   APP_NAME: z.string().default('AEO Nexus API'),
-  DATABASE_URL: z.string().url().describe('PostgreSQL connection string'),
+  DATABASE_URL: z.string().url().describe('Neon pooled connection string for runtime queries'),
+  DIRECT_URL: z
+    .string()
+    .url()
+    .optional()
+    .describe('Neon direct connection string for Prisma migrations'),
   REDIS_URL: z.string().describe('Redis connection string').default('redis://localhost:6379'),
   JWT_SECRET: z.string().min(16).default('aeo_nexus_dev_jwt_secret_key_32chars'),
   JWT_EXPIRES_IN: z.string().default('1d'),

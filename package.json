@@ -12,6 +12,11 @@
     "clean": "turbo run clean",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
+    "db:validate": "pnpm --filter @aeo-nexus/api run db:validate",
+    "db:generate": "pnpm --filter @aeo-nexus/api run db:generate",
+    "db:migrate": "pnpm --filter @aeo-nexus/api run db:migrate",
+    "db:deploy": "pnpm --filter @aeo-nexus/api run db:deploy",
+    "db:status": "pnpm --filter @aeo-nexus/api run db:status",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f"

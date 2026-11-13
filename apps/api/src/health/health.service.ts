@@ -30,11 +30,19 @@ export class HealthService {
     let dbStatus: ServiceStatus = 'down';
     let redisStatus: ServiceStatus = 'down';
 
-    // 1. PostgreSQL check
+    // 1. Neon PostgreSQL check (with 5-second cold-start tolerance)
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await Promise.race([
+        this.prisma.$queryRaw`SELECT 1`,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Neon database query timeout')), 5000),
+        ),
+      ]);
       dbStatus = 'up';
-    } catch {
+    } catch (err) {
+      this.logger.debug(
+        `Database health probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
       dbStatus = 'down';
     }
 

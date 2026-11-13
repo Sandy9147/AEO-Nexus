@@ -29,8 +29,11 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate Prisma Schema
+        run: pnpm run db:validate
+
       - name: Generate Prisma Client
-        run: pnpm --filter @aeo-nexus/api run db:generate
+        run: pnpm run db:generate
 
       - name: Check Formatting
         run: pnpm run format:check

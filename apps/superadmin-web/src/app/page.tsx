@@ -94,10 +94,12 @@ export default function SuperadminPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription>PostgreSQL Cluster</CardDescription>
+                <CardDescription>Neon Hosted PostgreSQL</CardDescription>
                 <CardTitle className="text-2xl font-bold text-[#16A36A]">Healthy</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-[#64748B]">Prisma Client v5.22.0</CardContent>
+              <CardContent className="text-xs text-[#64748B]">
+                Neon Pooled & Direct Connections
+              </CardContent>
             </Card>
 
             <Card>

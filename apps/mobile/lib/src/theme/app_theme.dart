@@ -24,7 +24,6 @@ class AeoNexusTheme {
         primary: AeoNexusColors.primary,
         secondary: AeoNexusColors.violetAccent,
         surface: AeoNexusColors.surface,
-        background: AeoNexusColors.background,
         error: Colors.red.shade600,
       ),
       appBarTheme: const AppBarTheme(
@@ -66,4 +65,3 @@ class AeoNexusTheme {
     );
   }
 }
-

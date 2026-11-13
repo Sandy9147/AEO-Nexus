@@ -28,7 +28,8 @@ class HomeScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AeoNexusColors.softBlue,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AeoNexusColors.primary.withOpacity(0.2)),
+                border: Border.all(
+                    color: AeoNexusColors.primary.withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,11 +76,13 @@ class HomeScreen extends StatelessWidget {
                     color: AeoNexusColors.softViolet,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.hub_outlined, color: AeoNexusColors.violetAccent),
+                  child: const Icon(Icons.hub_outlined,
+                      color: AeoNexusColors.violetAccent),
                 ),
                 title: const Text('Workflow Automation'),
                 subtitle: const Text('Active and monitored in background'),
-                trailing: const Icon(Icons.chevron_right, color: AeoNexusColors.textMuted),
+                trailing: const Icon(Icons.chevron_right,
+                    color: AeoNexusColors.textMuted),
               ),
             ),
           ],
@@ -88,4 +91,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
