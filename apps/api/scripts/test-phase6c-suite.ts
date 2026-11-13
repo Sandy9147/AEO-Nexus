@@ -592,6 +592,7 @@ async function runPhase6cSuite() {
       // Create another site in workspace B
       const siteB = await websiteService.createWebsite(workspaceB.id, user.id, {
         name: 'Workspace B Competitor',
+        websiteType: 'BUSINESS_WEBSITE',
       });
 
       let threw = false;
@@ -703,6 +704,7 @@ async function runPhase6cSuite() {
     await recordScenario(27, 'AI provider failure handling (caught, status reset to DRAFT)', async () => {
       const failureSite = await websiteService.createWebsite(workspaceA.id, user.id, {
         name: 'Failure Test Website',
+        websiteType: 'BUSINESS_WEBSITE',
       });
 
       // Pass invalid websiteId to trigger error in orchestrator
@@ -752,6 +754,7 @@ async function runPhase6cSuite() {
     await recordScenario(29, 'Generation cancellation behavior (skips archived websites)', async () => {
       const archivedSite = await websiteService.createWebsite(workspaceA.id, user.id, {
         name: 'Archived Site',
+        websiteType: 'BUSINESS_WEBSITE',
       });
       await websiteService.updateWebsite(workspaceA.id, archivedSite.id, {
         status: 'ARCHIVED',

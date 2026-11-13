@@ -1918,23 +1918,23 @@ export const SubdomainSchema = z
 
 export const CreateWebsiteProjectSchema = z.object({
   name: z.string().min(2, 'Website name must be at least 2 characters').max(100),
-  websiteType: z.string().default('BUSINESS_WEBSITE'),
+  websiteType: z.string().optional().default('BUSINESS_WEBSITE'),
   description: z.string().max(2000).optional(),
   targetAudience: z.string().max(500).optional(),
   targetMarket: z.string().max(500).optional(),
   planId: z.string().uuid().optional(),
   initiativeId: z.string().uuid().optional(),
 });
-export type CreateWebsiteProjectRequest = z.infer<typeof CreateWebsiteProjectSchema>;
+export type CreateWebsiteProjectRequest = z.input<typeof CreateWebsiteProjectSchema>;
 
 export const GenerateWebsiteSchema = z.object({
   name: z.string().min(2).max(100),
-  websiteType: z.string().default('BUSINESS_WEBSITE'),
+  websiteType: z.string().optional().default('BUSINESS_WEBSITE'),
   businessDescription: z.string().max(3000).optional(),
   targetAudience: z.string().max(500).optional(),
   targetMarket: z.string().max(500).optional(),
   websitePurpose: z.string().max(500).optional(),
-  requiredPages: z.array(z.string()).default(['/', '/about', '/services', '/contact']),
+  requiredPages: z.array(z.string()).optional().default(['/', '/about', '/services', '/contact']),
   brandColors: z
     .object({
       primary: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
@@ -1946,7 +1946,7 @@ export const GenerateWebsiteSchema = z.object({
   initiativeId: z.string().uuid().optional(),
   additionalInstructions: z.string().max(2000).optional(),
 });
-export type GenerateWebsiteRequest = z.infer<typeof GenerateWebsiteSchema>;
+export type GenerateWebsiteRequest = z.input<typeof GenerateWebsiteSchema>;
 
 export const UpdateWebsiteProjectSchema = z.object({
   name: z.string().min(2).max(100).optional(),
