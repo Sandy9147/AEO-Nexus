@@ -15,7 +15,7 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-  { name: 'AI Business Agent', href: '/agent', icon: '🤖', badge: 'Phase 5', isComingSoon: true },
+  { name: 'AI Business Agent', href: '/agent', icon: '🤖', badge: 'Active' },
   { name: 'Apps & Tools', href: '/apps', icon: '⚡' },
 ];
 

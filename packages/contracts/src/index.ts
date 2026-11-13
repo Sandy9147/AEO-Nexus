@@ -787,4 +787,252 @@ export interface ActivityEventDto {
   createdAt: string;
 }
 
+// ==============================================================================
+// 14. Phase 5: AI Foundation & AI Business Agent Contracts
+// ==============================================================================
+
+export const AiRunStatusEnum = z.enum([
+  'PENDING',
+  'RUNNING',
+  'COMPLETED',
+  'FAILED',
+  'REQUIRES_APPROVAL',
+  'CANCELLED',
+]);
+export type AiRunStatus = z.infer<typeof AiRunStatusEnum>;
+
+export const AiApprovalStatusEnum = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'EXPIRED',
+]);
+export type AiApprovalStatus = z.infer<typeof AiApprovalStatusEnum>;
+
+export const AiActionTypeEnum = z.enum([
+  'PUBLISH_CONTENT',
+  'SEND_EXTERNAL_MESSAGE',
+  'DELETE_DATA',
+  'MODIFY_SETTINGS',
+  'SPEND_MONEY',
+  'EXTERNAL_INTEGRATION',
+]);
+export type AiActionType = z.infer<typeof AiActionTypeEnum>;
+
+export interface AiCitationDto {
+  documentId: string;
+  title: string;
+  snippet?: string;
+  url?: string;
+}
+
+export interface AiToolExecutionDto {
+  id: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+  status?: 'SUCCESS' | 'FAILED' | 'REQUIRES_APPROVAL';
+  error?: string;
+}
+
+export interface AiMessageDto {
+  id: string;
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+  citations?: AiCitationDto[] | null;
+  toolCalls?: AiToolExecutionDto[] | null;
+  tokensUsed?: number | null;
+  createdAt: string;
+}
+
+export interface AiConversationDto {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  title: string;
+  model: string;
+  provider: string;
+  systemPrompt?: string | null;
+  isArchived: boolean;
+  messagesCount: number;
+  lastMessageAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiConversationDetailDto extends AiConversationDto {
+  messages: AiMessageDto[];
+}
+
+export const CreateAiConversationSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  model: z.string().min(1).max(100).optional(),
+  provider: z.string().min(1).max(50).optional(),
+  systemPrompt: z.string().max(4000).optional(),
+  initialMessage: z.string().min(1).max(20000).optional(),
+});
+export type CreateAiConversationRequest = z.infer<typeof CreateAiConversationSchema>;
+
+export const UpdateAiConversationSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  model: z.string().min(1).max(100).optional(),
+  provider: z.string().min(1).max(50).optional(),
+  systemPrompt: z.string().max(4000).optional().nullable(),
+  isArchived: z.boolean().optional(),
+});
+export type UpdateAiConversationRequest = z.infer<typeof UpdateAiConversationSchema>;
+
+export const SendAiMessageSchema = z.object({
+  content: z.string().min(1).max(20000),
+  model: z.string().optional(),
+  stream: z.boolean().optional(),
+});
+export type SendAiMessageRequest = z.infer<typeof SendAiMessageSchema>;
+
+export interface AiRunDto {
+  id: string;
+  workspaceId: string;
+  conversationId?: string | null;
+  userId: string;
+  prompt: string;
+  status: AiRunStatus;
+  provider: string;
+  model: string;
+  stepCount: number;
+  error?: string | null;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiRunDetailDto extends AiRunDto {
+  steps?: Array<{
+    stepNumber: number;
+    type: string;
+    description: string;
+    input?: unknown;
+    output?: unknown;
+    status: string;
+    timestamp: string;
+  }> | null;
+  approvals: AiApprovalDto[];
+}
+
+export interface AiApprovalDto {
+  id: string;
+  workspaceId: string;
+  runId?: string | null;
+  conversationId?: string | null;
+  actionType: AiActionType;
+  title: string;
+  description: string;
+  payload: Record<string, unknown>;
+  status: AiApprovalStatus;
+  requestedById: string;
+  requestedBy: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  reviewedById?: string | null;
+  reviewedBy?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null;
+  reviewedAt?: string | null;
+  reviewNotes?: string | null;
+  createdAt: string;
+}
+
+export const ReviewAiApprovalSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED']),
+  reviewNotes: z.string().max(1000).optional(),
+});
+export type ReviewAiApprovalRequest = z.infer<typeof ReviewAiApprovalSchema>;
+
+export interface AiWorkspaceConfigDto {
+  id: string;
+  workspaceId: string;
+  defaultProvider: string;
+  defaultModel: string;
+  monthlyTokenBudget: number;
+  monthlyCostBudget: number;
+  requireApprovalForSensitive: boolean;
+  customSystemInstructions?: string | null;
+  tokensUsedThisMonth: number;
+  costUsedThisMonth: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const UpdateAiWorkspaceConfigSchema = z.object({
+  defaultProvider: z.string().min(1).max(50).optional(),
+  defaultModel: z.string().min(1).max(100).optional(),
+  monthlyTokenBudget: z.number().int().min(1000).max(100000000).optional(),
+  monthlyCostBudget: z.number().min(1).max(10000).optional(),
+  requireApprovalForSensitive: z.boolean().optional(),
+  customSystemInstructions: z.string().max(5000).optional().nullable(),
+});
+export type UpdateAiWorkspaceConfigRequest = z.infer<typeof UpdateAiWorkspaceConfigSchema>;
+
+export interface AiPromptTemplateDto {
+  id: string;
+  workspaceId?: string | null;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  templateText: string;
+  variables: string[];
+  createdAt: string;
+}
+
+export interface AiUsageSummaryDto {
+  workspaceId: string;
+  totalTokens: number;
+  totalCostUsd: number;
+  recordsCount: number;
+  monthlyTokenBudget: number;
+  monthlyCostBudget: number;
+  tokenBudgetRemaining: number;
+  costBudgetRemaining: number;
+  byModel: Array<{
+    model: string;
+    provider: string;
+    tokens: number;
+    costUsd: number;
+    requestCount: number;
+  }>;
+}
+
+export interface AiToolDto {
+  id: string;
+  name: string;
+  description: string;
+  requiresApproval: boolean;
+  parameters: Record<string, unknown>;
+}
+
+export interface AiProviderStatusDto {
+  id: string;
+  name: string;
+  isConfigured: boolean;
+  availableModels: Array<{
+    id: string;
+    name: string;
+    description: string;
+    contextWindow: number;
+    inputCostPer1M: number;
+    outputCostPer1M: number;
+  }>;
+}
+
 

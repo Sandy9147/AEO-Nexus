@@ -120,6 +120,11 @@ model User {
   knowledgeVersions       KnowledgeDocumentVersion[]
   notifications           Notification[]
   activityEvents          ActivityEvent[]
+  aiConversations         AIConversation[]
+  aiRuns                  AIRun[]
+  aiRequestedApprovals    AIApproval[]               @relation("ApprovalRequester")
+  aiReviewedApprovals     AIApproval[]               @relation("ApprovalReviewer")
+  aiUsageRecords          AIUsageRecord[]
 
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
@@ -198,6 +203,11 @@ model Workspace {
   knowledgeDocuments KnowledgeDocument[]
   notifications      Notification[]
   activityEvents     ActivityEvent[]
+  aiConversations    AIConversation[]
+  aiRuns             AIRun[]
+  aiApprovals        AIApproval[]
+  aiUsageRecords     AIUsageRecord[]
+  aiConfig           AIWorkspaceConfig?
 
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -568,4 +578,194 @@ model ActivityEvent {
   @@index([workspaceId])
   @@index([resourceType, resourceId])
   @@map("activity_events")
+}
+
+// ============================================================================
+// PHASE 5: AI FOUNDATION & AI BUSINESS AGENT
+// ============================================================================
+
+enum AiRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  REQUIRES_APPROVAL
+  CANCELLED
+}
+
+enum AiApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum AiActionType {
+  PUBLISH_CONTENT
+  SEND_EXTERNAL_MESSAGE
+  DELETE_DATA
+  MODIFY_SETTINGS
+  SPEND_MONEY
+  EXTERNAL_INTEGRATION
+}
+
+model AIConversation {
+  id           String        @id @default(uuid())
+  workspaceId  String        @map("workspace_id")
+  userId       String        @map("user_id")
+  title        String
+  model        String        @default("mock-agent-fast")
+  provider     String        @default("mock")
+  systemPrompt String?       @map("system_prompt")
+  isArchived   Boolean       @default(false) @map("is_archived")
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     AIMessage[]
+  runs         AIRun[]
+  approvals    AIApproval[]
+
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String         @id @default(uuid())
+  conversationId String         @map("conversation_id")
+  role           String         // user, assistant, system, tool
+  content        String
+  citations      Json?          // Array of { title, documentId, snippet, url }
+  toolCalls      Json?          @map("tool_calls") // Array of { id, toolName, args, result, status }
+  tokensUsed     Int?           @map("tokens_used")
+
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@map("ai_messages")
+}
+
+model AIRun {
+  id               String         @id @default(uuid())
+  workspaceId      String         @map("workspace_id")
+  conversationId   String?        @map("conversation_id")
+  userId           String         @map("user_id")
+  prompt           String
+  status           AiRunStatus    @default(PENDING)
+  provider         String
+  model            String
+  stepCount        Int            @default(0) @map("step_count")
+  steps            Json?          // execution trace
+  error            String?
+  promptTokens     Int            @default(0) @map("prompt_tokens")
+  completionTokens Int            @default(0) @map("completion_tokens")
+  totalTokens      Int            @default(0) @map("total_tokens")
+  costUsd          Decimal        @default(0) @db.Decimal(10, 6) @map("cost_usd")
+
+  workspace        Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation     AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  approvals        AIApproval[]
+
+  completedAt      DateTime?      @map("completed_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([status])
+  @@map("ai_runs")
+}
+
+model AIApproval {
+  id            String           @id @default(uuid())
+  workspaceId   String           @map("workspace_id")
+  runId         String?          @map("run_id")
+  conversationId String?         @map("conversation_id")
+  actionType    AiActionType     @map("action_type")
+  title         String
+  description   String
+  payload       Json
+  status        AiApprovalStatus @default(PENDING)
+  requestedById String           @map("requested_by_id")
+  reviewedById  String?          @map("reviewed_by_id")
+  reviewedAt    DateTime?        @map("reviewed_at")
+  reviewNotes   String?          @map("review_notes")
+
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  run           AIRun?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+  conversation  AIConversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  requestedBy   User             @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy    User?            @relation("ApprovalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([status])
+  @@map("ai_approvals")
+}
+
+model AIUsageRecord {
+  id              String       @id @default(uuid())
+  workspaceId     String       @map("workspace_id")
+  userId          String       @map("user_id")
+  provider        String
+  model           String
+  requestId       String       @map("request_id")
+  promptTokens    Int          @map("prompt_tokens")
+  completionTokens Int         @map("completion_tokens")
+  totalTokens     Int          @map("total_tokens")
+  estimatedCost   Decimal      @db.Decimal(10, 6) @map("estimated_cost")
+  status          String       @default("SUCCESS")
+
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ai_usage_records")
+}
+
+model AIWorkspaceConfig {
+  id                          String    @id @default(uuid())
+  workspaceId                 String    @unique @map("workspace_id")
+  defaultProvider             String    @default("mock") @map("default_provider")
+  defaultModel                String    @default("mock-agent-fast") @map("default_model")
+  monthlyTokenBudget          Int       @default(1000000) @map("monthly_token_budget")
+  monthlyCostBudget           Decimal   @default(50.00) @db.Decimal(10, 2) @map("monthly_cost_budget")
+  requireApprovalForSensitive Boolean   @default(true) @map("require_approval_for_sensitive")
+  customSystemInstructions    String?   @map("custom_system_instructions")
+
+  workspace                   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt                   DateTime  @default(now()) @map("created_at")
+  updatedAt                   DateTime  @updatedAt @map("updated_at")
+
+  @@map("ai_workspace_configs")
+}
+
+model AIPromptTemplate {
+  id           String    @id @default(uuid())
+  workspaceId  String?   @map("workspace_id")
+  name         String
+  slug         String
+  category     String    // STRATEGY, CONTENT, RESEARCH, OPERATIONS
+  description  String
+  templateText String    @map("template_text")
+  variables    String[]  @default([])
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([slug])
+  @@map("ai_prompt_templates")
 }

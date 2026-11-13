@@ -16,6 +16,7 @@
     "db:status": "node scripts/verify-migration-env.js migrate status"
   },
   "dependencies": {
+    "@aeo-nexus/ai": "workspace:*",
     "@aeo-nexus/auth": "workspace:*",
     "@aeo-nexus/config": "workspace:*",
     "@aeo-nexus/contracts": "workspace:*",

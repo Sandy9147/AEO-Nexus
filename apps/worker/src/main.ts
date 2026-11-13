@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { processWorkflowJob } from './processors/health.processor';
+import { processAiRunJob } from './processors/ai-run.processor';
 
 async function bootstrap() {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -24,26 +25,40 @@ async function bootstrap() {
     );
   }
 
-  const worker = new Worker('aeo-nexus-workflows', processWorkflowJob, {
+  const workflowWorker = new Worker('aeo-nexus-workflows', processWorkflowJob, {
     connection,
     concurrency: 5,
   });
 
-  worker.on('completed', (job) => {
-    console.log(`[Worker] Job ${job.id} completed successfully`);
+  const aiWorker = new Worker('aeo-nexus-ai-runs', processAiRunJob, {
+    connection,
+    concurrency: 3,
   });
 
-  worker.on('failed', (job, err) => {
-    console.error(`[Worker] Job ${job?.id} failed with error:`, err);
+  workflowWorker.on('completed', (job) => {
+    console.log(`[Workflow Worker] Job ${job.id} completed successfully`);
+  });
+
+  workflowWorker.on('failed', (job, err) => {
+    console.error(`[Workflow Worker] Job ${job?.id} failed with error:`, err);
+  });
+
+  aiWorker.on('completed', (job) => {
+    console.log(`[AI Worker] Job ${job.id} completed successfully`);
+  });
+
+  aiWorker.on('failed', (job, err) => {
+    console.error(`[AI Worker] Job ${job?.id} failed with error:`, err);
   });
 
   console.log(
-    '⚡ AEO Nexus Worker is running and listening for jobs on queue "aeo-nexus-workflows"',
+    '⚡ AEO Nexus Worker is running and listening for jobs on queues "aeo-nexus-workflows" and "aeo-nexus-ai-runs"',
   );
 
   const shutdown = async () => {
     console.log('[Worker] Shutting down gracefully...');
-    await worker.close();
+    await workflowWorker.close();
+    await aiWorker.close();
     await connection.quit();
     process.exit(0);
   };

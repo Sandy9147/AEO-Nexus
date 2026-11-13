@@ -47,6 +47,22 @@ import {
   UpdateKnowledgeDocumentRequest,
   NotificationDto,
   ActivityEventDto,
+  AiConversationDto,
+  AiConversationDetailDto,
+  CreateAiConversationRequest,
+  UpdateAiConversationRequest,
+  AiMessageDto,
+  SendAiMessageRequest,
+  AiRunDto,
+  AiRunDetailDto,
+  AiApprovalDto,
+  ReviewAiApprovalRequest,
+  AiWorkspaceConfigDto,
+  UpdateAiWorkspaceConfigRequest,
+  AiPromptTemplateDto,
+  AiUsageSummaryDto,
+  AiToolDto,
+  AiProviderStatusDto,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -644,5 +660,119 @@ export class AeoNexusApiClient {
     limit = 20,
   ): Promise<ActivityEventDto[]> {
     return this.request<ActivityEventDto[]>(`/workspaces/${workspaceId}/activity?limit=${limit}`);
+  }
+
+  // ==============================================================================
+  // Phase 5: AI Business Agent & Foundation
+  // ==============================================================================
+
+  async getAiProviderStatus(workspaceId: string): Promise<AiProviderStatusDto[]> {
+    return this.request<AiProviderStatusDto[]>(`/workspaces/${workspaceId}/ai/providers`);
+  }
+
+  async getAiWorkspaceConfig(workspaceId: string): Promise<AiWorkspaceConfigDto> {
+    return this.request<AiWorkspaceConfigDto>(`/workspaces/${workspaceId}/ai/config`);
+  }
+
+  async updateAiWorkspaceConfig(
+    workspaceId: string,
+    payload: UpdateAiWorkspaceConfigRequest,
+  ): Promise<AiWorkspaceConfigDto> {
+    return this.request<AiWorkspaceConfigDto>(`/workspaces/${workspaceId}/ai/config`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getAiConversations(workspaceId: string): Promise<AiConversationDto[]> {
+    return this.request<AiConversationDto[]>(`/workspaces/${workspaceId}/ai/conversations`);
+  }
+
+  async createAiConversation(
+    workspaceId: string,
+    payload: CreateAiConversationRequest,
+  ): Promise<AiConversationDetailDto> {
+    return this.request<AiConversationDetailDto>(`/workspaces/${workspaceId}/ai/conversations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getAiConversation(
+    workspaceId: string,
+    conversationId: string,
+  ): Promise<AiConversationDetailDto> {
+    return this.request<AiConversationDetailDto>(`/workspaces/${workspaceId}/ai/conversations/${conversationId}`);
+  }
+
+  async updateAiConversation(
+    workspaceId: string,
+    conversationId: string,
+    payload: UpdateAiConversationRequest,
+  ): Promise<AiConversationDto> {
+    return this.request<AiConversationDto>(`/workspaces/${workspaceId}/ai/conversations/${conversationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteAiConversation(
+    workspaceId: string,
+    conversationId: string,
+  ): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>(`/workspaces/${workspaceId}/ai/conversations/${conversationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async sendAiMessage(
+    workspaceId: string,
+    conversationId: string,
+    payload: SendAiMessageRequest,
+  ): Promise<{ message: AiMessageDto; assistantMessage: AiMessageDto; runId: string }> {
+    return this.request<{ message: AiMessageDto; assistantMessage: AiMessageDto; runId: string }>(
+      `/workspaces/${workspaceId}/ai/conversations/${conversationId}/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async getAiRuns(workspaceId: string, conversationId?: string): Promise<AiRunDto[]> {
+    const qs = conversationId ? `?conversationId=${conversationId}` : '';
+    return this.request<AiRunDto[]>(`/workspaces/${workspaceId}/ai/runs${qs}`);
+  }
+
+  async getAiRun(workspaceId: string, runId: string): Promise<AiRunDetailDto> {
+    return this.request<AiRunDetailDto>(`/workspaces/${workspaceId}/ai/runs/${runId}`);
+  }
+
+  async getAiApprovals(workspaceId: string, status?: string): Promise<AiApprovalDto[]> {
+    const qs = status ? `?status=${status}` : '';
+    return this.request<AiApprovalDto[]>(`/workspaces/${workspaceId}/ai/approvals${qs}`);
+  }
+
+  async reviewAiApproval(
+    workspaceId: string,
+    approvalId: string,
+    payload: ReviewAiApprovalRequest,
+  ): Promise<AiApprovalDto> {
+    return this.request<AiApprovalDto>(`/workspaces/${workspaceId}/ai/approvals/${approvalId}/review`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getAiUsageSummary(workspaceId: string): Promise<AiUsageSummaryDto> {
+    return this.request<AiUsageSummaryDto>(`/workspaces/${workspaceId}/ai/usage`);
+  }
+
+  async getAiTools(workspaceId: string): Promise<AiToolDto[]> {
+    return this.request<AiToolDto[]>(`/workspaces/${workspaceId}/ai/tools`);
+  }
+
+  async getAiPromptTemplates(workspaceId: string): Promise<AiPromptTemplateDto[]> {
+    return this.request<AiPromptTemplateDto[]>(`/workspaces/${workspaceId}/ai/templates`);
   }
 }

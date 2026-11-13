@@ -10,6 +10,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { AssetsModule } from './assets/assets.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AssetsModule,
     KnowledgeModule,
     NotificationsModule,
+    AiModule,
   ],
 })
 export class AppModule {}
