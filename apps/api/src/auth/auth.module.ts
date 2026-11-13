@@ -5,8 +5,11 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { WorkspaceMembershipGuard } from './guards/workspace.guard';
 import { PlatformRoleGuard } from './guards/platform-role.guard';
 import { WorkspaceRoleGuard } from './guards/workspace-role.guard';
+import { RateLimiterGuard } from './guards/rate-limiter.guard';
+import { EmailModule } from '../email/email.module';
 
 @Module({
+  imports: [EmailModule],
   controllers: [AuthController],
   providers: [
     AuthService,
@@ -14,6 +17,7 @@ import { WorkspaceRoleGuard } from './guards/workspace-role.guard';
     WorkspaceMembershipGuard,
     PlatformRoleGuard,
     WorkspaceRoleGuard,
+    RateLimiterGuard,
   ],
   exports: [
     AuthService,
@@ -21,6 +25,7 @@ import { WorkspaceRoleGuard } from './guards/workspace-role.guard';
     WorkspaceMembershipGuard,
     PlatformRoleGuard,
     WorkspaceRoleGuard,
+    RateLimiterGuard,
   ],
 })
 export class AuthModule {}

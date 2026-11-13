@@ -37,6 +37,28 @@ export interface IPasswordHasher {
 
 export const AUTH_HEADER = 'authorization';
 export const WORKSPACE_HEADER = 'x-workspace-id';
+export const REFRESH_COOKIE_NAME = 'aeo_nexus_refresh_token';
+
+// Standard Token Lifetimes
+export const ACCESS_TOKEN_TTL_SECONDS = 900; // 15 minutes
+export const REFRESH_TOKEN_TTL_SECONDS = 604800; // 7 days
+export const EMAIL_VERIFICATION_TTL_SECONDS = 86400; // 24 hours
+export const PASSWORD_RESET_TTL_SECONDS = 3600; // 1 hour
+
+/**
+ * Generate a cryptographically secure, high-entropy opaque token.
+ */
+export function generateOpaqueToken(bytes = 32): string {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+/**
+ * Compute a SHA-256 hash of an opaque token for database storage.
+ * Raw tokens are never stored plaintext in the database.
+ */
+export function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 /**
  * Sign JWT using HMAC-SHA256 with strict minimum 32-character secret material.

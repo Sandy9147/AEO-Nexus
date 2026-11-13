@@ -27,8 +27,9 @@ export enum WorkspaceRole {
 export enum AgencyRole {
   AGENCY_OWNER = 'AGENCY_OWNER',
   AGENCY_ADMIN = 'AGENCY_ADMIN',
-  AGENCY_OPERATOR = 'AGENCY_OPERATOR',
-  AGENCY_VIEWER = 'AGENCY_VIEWER',
+  AGENCY_MANAGER = 'AGENCY_MANAGER',
+  AGENCY_EDITOR = 'AGENCY_EDITOR',
+  AGENCY_CLIENT = 'AGENCY_CLIENT',
 }
 
 // 4. Platform Administration Permissions
@@ -56,6 +57,15 @@ export enum WorkspacePermission {
   AI_AGENT_CONFIG = 'workspace:ai:config',
   AI_AGENT_EXECUTE = 'workspace:ai:execute',
   ANALYTICS_VIEW = 'workspace:analytics:view',
+}
+
+// 6. Agency Permissions (Partner multi-tenant management)
+export enum AgencyPermission {
+  AGENCY_SETTINGS_MANAGE = 'agency:settings:manage',
+  AGENCY_CLIENTS_MANAGE = 'agency:clients:manage',
+  AGENCY_CLIENTS_VIEW = 'agency:clients:view',
+  AGENCY_MEMBERS_MANAGE = 'agency:members:manage',
+  AGENCY_BILLING_MANAGE = 'agency:billing:manage',
 }
 
 // Role-to-Permissions Maps
@@ -111,6 +121,26 @@ export const WORKSPACE_ROLE_PERMISSIONS: Record<WorkspaceRole, WorkspacePermissi
   ],
 };
 
+export const AGENCY_ROLE_PERMISSIONS: Record<AgencyRole, AgencyPermission[]> = {
+  [AgencyRole.AGENCY_OWNER]: Object.values(AgencyPermission),
+  [AgencyRole.AGENCY_ADMIN]: [
+    AgencyPermission.AGENCY_SETTINGS_MANAGE,
+    AgencyPermission.AGENCY_CLIENTS_MANAGE,
+    AgencyPermission.AGENCY_CLIENTS_VIEW,
+    AgencyPermission.AGENCY_MEMBERS_MANAGE,
+  ],
+  [AgencyRole.AGENCY_MANAGER]: [
+    AgencyPermission.AGENCY_CLIENTS_MANAGE,
+    AgencyPermission.AGENCY_CLIENTS_VIEW,
+  ],
+  [AgencyRole.AGENCY_EDITOR]: [
+    AgencyPermission.AGENCY_CLIENTS_VIEW,
+  ],
+  [AgencyRole.AGENCY_CLIENT]: [
+    AgencyPermission.AGENCY_CLIENTS_VIEW,
+  ],
+};
+
 export function hasPlatformPermission(
   role: PlatformRole | null | undefined,
   permission: PlatformPermission,
@@ -126,6 +156,15 @@ export function hasWorkspacePermission(
 ): boolean {
   if (!role) return false;
   const permissions = WORKSPACE_ROLE_PERMISSIONS[role] || [];
+  return permissions.includes(permission);
+}
+
+export function hasAgencyPermission(
+  role: AgencyRole | null | undefined,
+  permission: AgencyPermission,
+): boolean {
+  if (!role) return false;
+  const permissions = AGENCY_ROLE_PERMISSIONS[role] || [];
   return permissions.includes(permission);
 }
 

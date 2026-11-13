@@ -4,6 +4,15 @@ import {
   LoginResponse,
   RegisterRequest,
   WorkspaceSummary,
+  UserProfile,
+  SessionInfo,
+  WorkspaceDetail,
+  WorkspaceMemberInfo,
+  WorkspaceInvitationInfo,
+  InviteWorkspaceMemberRequest,
+  UpdateMemberRoleRequest,
+  UpdateWorkspaceRequest,
+  CreateWorkspaceRequest,
 } from '@aeo-nexus/contracts';
 
 export interface ApiClientOptions {
@@ -96,8 +105,155 @@ export class AeoNexusApiClient {
     });
   }
 
+  async logout(): Promise<{ loggedOut: boolean }> {
+    return this.request<{ loggedOut: boolean }>('/auth/logout', {
+      method: 'POST',
+    });
+  }
+
+  async getMe(): Promise<UserProfile> {
+    return this.request<UserProfile>('/auth/me');
+  }
+
+  async refreshToken(refreshToken?: string): Promise<LoginResponse> {
+    return this.request<LoginResponse>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  }
+
+  async verifyEmail(token: string): Promise<{ verified: boolean; message: string }> {
+    return this.request<{ verified: boolean; message: string }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
+  async getSessions(): Promise<SessionInfo[]> {
+    return this.request<SessionInfo[]>('/auth/sessions');
+  }
+
+  async revokeSession(sessionId: string): Promise<{ revoked: boolean }> {
+    return this.request<{ revoked: boolean }>(`/auth/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async revokeAllSessions(): Promise<{ revokedCount: number }> {
+    return this.request<{ revokedCount: number }>('/auth/sessions', {
+      method: 'DELETE',
+    });
+  }
+
   // Workspaces
   async listWorkspaces(): Promise<WorkspaceSummary[]> {
     return this.request<WorkspaceSummary[]>('/workspaces');
+  }
+
+  async createWorkspace(payload: CreateWorkspaceRequest): Promise<WorkspaceSummary> {
+    return this.request<WorkspaceSummary>('/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getWorkspace(id: string): Promise<WorkspaceDetail> {
+    return this.request<WorkspaceDetail>(`/workspaces/${id}`);
+  }
+
+  async updateWorkspace(id: string, payload: UpdateWorkspaceRequest): Promise<WorkspaceDetail> {
+    return this.request<WorkspaceDetail>(`/workspaces/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async inviteMember(
+    workspaceId: string,
+    payload: InviteWorkspaceMemberRequest,
+  ): Promise<WorkspaceInvitationInfo> {
+    return this.request<WorkspaceInvitationInfo>(`/workspaces/${workspaceId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async listInvitations(workspaceId: string): Promise<WorkspaceInvitationInfo[]> {
+    return this.request<WorkspaceInvitationInfo[]>(`/workspaces/${workspaceId}/invitations`);
+  }
+
+  async cancelInvitation(
+    workspaceId: string,
+    invitationId: string,
+  ): Promise<{ cancelled: boolean }> {
+    return this.request<{ cancelled: boolean }>(
+      `/workspaces/${workspaceId}/invitations/${invitationId}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  }
+
+  async acceptInvitation(token: string): Promise<{ accepted: boolean; workspaceId: string }> {
+    return this.request<{ accepted: boolean; workspaceId: string }>(
+      `/workspaces/invitations/${token}/accept`,
+      {
+        method: 'POST',
+      },
+    );
+  }
+
+  async declineInvitation(token: string): Promise<{ declined: boolean }> {
+    return this.request<{ declined: boolean }>(`/workspaces/invitations/${token}/decline`, {
+      method: 'POST',
+    });
+  }
+
+  async getMembers(workspaceId: string): Promise<WorkspaceMemberInfo[]> {
+    return this.request<WorkspaceMemberInfo[]>(`/workspaces/${workspaceId}/members`);
+  }
+
+  async updateMemberRole(
+    workspaceId: string,
+    memberId: string,
+    payload: UpdateMemberRoleRequest,
+  ): Promise<WorkspaceMemberInfo> {
+    return this.request<WorkspaceMemberInfo>(
+      `/workspaces/${workspaceId}/members/${memberId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+    );
+  }
+
+  async removeMember(workspaceId: string, memberId: string): Promise<{ removed: boolean }> {
+    return this.request<{ removed: boolean }>(
+      `/workspaces/${workspaceId}/members/${memberId}`,
+      {
+        method: 'DELETE',
+      },
+    );
   }
 }
