@@ -10,11 +10,10 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",
     "sourceMap": true,
+    "noEmit": false,
+    "rootDir": "src",
     "outDir": "./dist",
     "baseUrl": "./",
-    "paths": {
-      "@aeo-nexus/ai": ["../../packages/ai/src/index.ts"]
-    },
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
