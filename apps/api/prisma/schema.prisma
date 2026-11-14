@@ -91,6 +91,11 @@ enum NotificationType {
   SYSTEM_ALERT
 }
 
+enum MfaChallengePurpose {
+  MFA_LOGIN
+  MFA_SETUP
+}
+
 model User {
   id              String        @id @default(uuid())
   email           String        @unique
@@ -140,6 +145,7 @@ model User {
   conductedStrategyReviews  StrategyReview[]          @relation("ReviewConductor")
   createdWebsites           WebsiteProject[]          @relation("WebsiteCreator")
   publishedWebsites         WebsitePublication[]      @relation("WebsitePublisher")
+  mfaChallenges             MfaChallenge[]
 
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
@@ -196,6 +202,24 @@ model PasswordResetToken {
   @@index([userId])
   @@index([tokenHash])
   @@map("password_reset_tokens")
+}
+
+model MfaChallenge {
+  id            String              @id @default(uuid())
+  userId        String              @map("user_id")
+  challengeId   String              @unique @map("challenge_id")
+  purpose       MfaChallengePurpose @map("purpose")
+  expiresAt     DateTime            @map("expires_at")
+  consumedAt    DateTime?           @map("consumed_at")
+  invalidatedAt DateTime?           @map("invalidated_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([challengeId])
+  @@index([expiresAt])
+  @@map("mfa_challenges")
 }
 
 model Workspace {

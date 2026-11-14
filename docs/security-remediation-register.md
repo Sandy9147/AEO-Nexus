@@ -1,6 +1,6 @@
 # AEO Nexus — Security Remediation Register
 
-This register documents all security findings identified during the Phase 7A Full Repository Security Audit, the precise code remediations implemented, and the verification status across all components.
+This register documents all security findings identified during the Phase 7A, 7A.1, and 7A.2 Security Audits, the precise code remediations implemented, and the verification status across all components.
 
 ---
 
@@ -22,13 +22,21 @@ This register documents all security findings identified during the Phase 7A Ful
 | **SEC-MFA-002** | **Code-Only Replay Prevention Flaw**<br>Last-code-only matching allowed replaying valid codes across past/future drift steps. | **High** | `apps/api/prisma/schema.prisma`<br>`apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts` | Added `mfa_last_used_step` to PostgreSQL. Implemented RFC 6238 counter step tracking rejecting any counter $S \le \text{lastAcceptedStep}$. Enforced atomic conditional updates (`where: { OR: [{ mfaLastUsedStep: null }, { mfaLastUsedStep: { lt: acceptedStep } }] }`) to eliminate race conditions. | Phase 7A.1 Scenarios 8, 9, 10 | **RESOLVED & VERIFIED** |
 | **SEC-MFA-003** | **Unsalted / Unkeyed Recovery Codes**<br>Recovery backup codes hashed with raw unkeyed SHA-256 vulnerable to offline dictionary attack if DB leaked. | **Medium** | `apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts` | Upgraded to keyed HMAC-SHA256 with server-side pepper (`MFA_RECOVERY_PEPPER` or HKDF derivation). Implemented atomic conditional consumption (`mfaRecoveryCodes: { has: targetHash }`). Plaintext codes never persisted. | Phase 7A.1 Scenarios 3, 11, 12, 13 | **RESOLVED & VERIFIED** |
 | **SEC-MFA-004** | **MFA Challenge Token Privilege Escalation**<br>Short-lived challenge tickets could potentially be presented to resource endpoints. | **High** | `apps/api/src/auth/guards/jwt-auth.guard.ts`<br>`apps/api/src/auth/auth.service.ts` | Hardened `JwtAuthGuard` to explicitly reject tokens with `type: 'mfa_challenge'` or `'mfa_setup_challenge'`. Guaranteed zero session or token creation before verified second-factor completion. | Phase 7A.1 Scenarios 4, 5, 6 | **RESOLVED & VERIFIED** |
+| **SEC-OPS-001** | **Implicit Key Derivation from JWT Signing Secret**<br>Production MFA keys could silently derive from `JWT_SECRET`, meaning JWT key rotation would render encrypted MFA secrets permanently unrecoverable. | **Critical** | `apps/api/src/auth/mfa.service.ts` | Enforced strict independent production keys (`MFA_ENCRYPTION_KEY` 32 bytes hex/base64, `MFA_RECOVERY_PEPPER` min 32 chars). Added `onModuleInit` check throwing fatal startup errors in production if keys are missing or invalid. Decoupled MFA secrets entirely from JWT rotation. | Phase 7A.2 Ops Scenarios 1, 2, 3, 4 | **RESOLVED & VERIFIED** |
+| **SEC-OPS-002** | **Multi-Version Key Rotation Support**<br>Lack of structured versioning hindered zero-downtime key rotation for data encrypted at rest. | **High** | `apps/api/src/auth/mfa.service.ts` | Implemented versioned key rotation via `MFA_KEY_VERSION` and `MFA_ENCRYPTION_KEYS` JSON map. Old secrets decrypt using their tagged envelope version; new encryptions write using the active version. | Phase 7A.2 Ops Scenarios 5, 6 | **RESOLVED & VERIFIED** |
+| **SEC-OPS-003** | **Replay of Active In-Flight MFA Challenges**<br>Short-lived JWT challenge tickets could be reused multiple times with subsequent valid TOTP codes during their 5-minute lifespan. | **High** | `apps/api/prisma/schema.prisma`<br>`apps/api/src/auth/auth.service.ts` | Added `mfa_challenges` table in Neon PostgreSQL. Assigned unique cryptographically random UUID `jti` to every challenge. Enforced atomic conditional consumption (`consumedAt: now`) and instant invalidation on authentication success. | Phase 7A.2 Ops Scenarios 7, 8, 9, 10, 11<br>HTTP Scenarios 1, 4, 7 | **RESOLVED & VERIFIED** |
+| **SEC-OPS-004** | **Legacy Recovery Code Migration & Regeneration**<br>Existing users with legacy SHA-256 recovery codes needed safe migration path without losing access. | **Medium** | `apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts`<br>`apps/api/src/auth/auth.controller.ts` | Built dual verifier handling modern HMAC-SHA256 and legacy SHA-256 codes transparently. Added `POST /auth/mfa/regenerate-recovery-codes` to allow users to generate 10 fresh HMAC-SHA256 codes anytime. | Phase 7A.2 Ops Scenarios 12, 13<br>HTTP Scenarios 8, 10 | **RESOLVED & VERIFIED** |
 
 ---
 
 ## Remediation Sign-Off Summary
 - **Phase 7A Baseline Security Findings**: 10 (10/10 Resolved & Verified)
 - **Phase 7A.1 MFA Cryptographic Hardening Findings**: 4 (4/4 Resolved & Verified)
-- **Automated Test Scenarios Executed**: 46 (30 Phase 7A + 16 Phase 7A.1)
-- **Test Pass Rate**: 100% (46/46 Passed)
+- **Phase 7A.2 Operational & Challenge Lifecycle Findings**: 4 (4/4 Resolved & Verified)
+- **Automated Test Scenarios Executed**: 70
+  - Phase 7A Core Security Suite: 30 / 30 Passed
+  - Phase 7A.1 Cryptographic Suite: 16 / 16 Passed
+  - Phase 7A.2 Operational & Key Rotation Suite: 13 / 13 Passed
+  - Phase 7A.2 Real HTTP Integration Suite: 11 / 11 Passed
+- **Test Pass Rate**: 100% (70/70 Passed)
 - **Production Baseline Status**: **APPROVED & CRYPTOGRAPHICALLY HARDENED**
-

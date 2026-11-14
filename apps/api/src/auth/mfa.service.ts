@@ -1,29 +1,132 @@
-import { Injectable, BadRequestException, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 
 @Injectable()
-export class MfaService {
+export class MfaService implements OnModuleInit {
   private readonly logger = new Logger(MfaService.name);
   private readonly BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  private readonly CURRENT_KEY_VERSION = 'v1';
+
+  onModuleInit() {
+    this.validateProductionKeys();
+  }
 
   /**
-   * Derive or obtain the 256-bit encryption key for the given version.
-   * Encryption keys are kept strictly outside the database.
+   * Validate production keys on startup or readiness verification.
+   * In production (NODE_ENV === 'production'), strict independent keys are mandatory.
+   * Throws an Error if required keys are missing or invalid, halting startup safely.
    */
-  private getEncryptionKey(version = 'v1'): Buffer {
-    if (version !== 'v1') {
-      throw new Error(`Unsupported MFA encryption key version: ${version}`);
-    }
+  validateProductionKeys(): void {
+    const isProd = process.env.NODE_ENV === 'production';
 
-    const envKey = process.env.MFA_ENCRYPTION_KEY;
-    if (envKey && envKey.trim().length >= 32) {
-      if (/^[0-9a-fA-F]{64}$/.test(envKey.trim())) {
-        return Buffer.from(envKey.trim(), 'hex');
+    // 1. Encryption Key Validation
+    const encKey = process.env.MFA_ENCRYPTION_KEY;
+    if (isProd) {
+      if (!encKey || encKey.trim().length === 0 || encKey === 'undefined') {
+        throw new Error(
+          'FATAL CONFIGURATION ERROR: MFA_ENCRYPTION_KEY is required in production. ' +
+          'Must be a 64-character hexadecimal or 44-character base64 string (32 bytes).',
+        );
       }
-      return crypto.createHash('sha256').update(envKey.trim()).digest();
+      this.parseAndValidateKey(encKey, 'MFA_ENCRYPTION_KEY');
+    } else if (encKey && encKey.trim().length > 0 && encKey !== 'undefined') {
+      this.parseAndValidateKey(encKey, 'MFA_ENCRYPTION_KEY');
+    } else {
+      this.logger.warn(
+        '[SECURITY NOTICE] MFA_ENCRYPTION_KEY not set. Falling back to development HKDF key derivation. ' +
+        'DO NOT RUN IN PRODUCTION WITHOUT AN EXPLICIT MFA_ENCRYPTION_KEY.',
+      );
     }
 
+    // 2. Recovery Pepper Validation
+    const recoveryPepper = process.env.MFA_RECOVERY_PEPPER;
+    if (isProd) {
+      if (!recoveryPepper || recoveryPepper.trim().length < 32 || recoveryPepper === 'undefined') {
+        throw new Error(
+          'FATAL CONFIGURATION ERROR: MFA_RECOVERY_PEPPER is required in production and must be at least 32 characters.',
+        );
+      }
+    } else if (!recoveryPepper || recoveryPepper === 'undefined') {
+      this.logger.warn(
+        '[SECURITY NOTICE] MFA_RECOVERY_PEPPER not set. Falling back to development HKDF pepper derivation. ' +
+        'DO NOT RUN IN PRODUCTION WITHOUT AN EXPLICIT MFA_RECOVERY_PEPPER.',
+      );
+    }
+  }
+
+  /**
+   * Strictly parse and validate a 32-byte (256-bit) encryption key from hex or base64.
+   */
+  parseAndValidateKey(keyString: string, keyName = 'MFA_ENCRYPTION_KEY'): Buffer {
+    if (!keyString || typeof keyString !== 'string') {
+      throw new Error(`Invalid ${keyName}: Key value must be a non-empty string.`);
+    }
+
+    const trimmed = keyString.trim();
+
+    // 64-char hexadecimal (32 bytes)
+    if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+      return Buffer.from(trimmed, 'hex');
+    }
+
+    // 44-char base64 (32 bytes)
+    if (/^[A-Za-z0-9+/]{43}=$/.test(trimmed) || /^[A-Za-z0-9+/]{42}==$/.test(trimmed)) {
+      const buf = Buffer.from(trimmed, 'base64');
+      if (buf.length === 32) return buf;
+    }
+
+    throw new Error(
+      `Invalid ${keyName} format: Key must be exactly 32 bytes (64 hexadecimal characters or 44 base64 characters).`,
+    );
+  }
+
+  /**
+   * Active key version to use for new encryptions (default: 'v1').
+   */
+  getActiveKeyVersion(): string {
+    return (process.env.MFA_KEY_VERSION || 'v1').trim().toLowerCase();
+  }
+
+  /**
+   * Obtain the 256-bit encryption key for the given version.
+   * Supports multi-version key rotation:
+   * e.g. v1 -> MFA_ENCRYPTION_KEY_V1 (or MFA_ENCRYPTION_KEY fallback)
+   *      v2 -> MFA_ENCRYPTION_KEY_V2 (or MFA_ENCRYPTION_KEY if active is v2)
+   */
+  getEncryptionKey(version = 'v1'): Buffer {
+    const normalizedVersion = version.toLowerCase();
+
+    // 1. Version-specific environment key: MFA_ENCRYPTION_KEY_V1, MFA_ENCRYPTION_KEY_V2
+    const versionKey = process.env[`MFA_ENCRYPTION_KEY_${normalizedVersion.toUpperCase()}`];
+    if (versionKey && versionKey.trim().length > 0) {
+      return this.parseAndValidateKey(
+        versionKey,
+        `MFA_ENCRYPTION_KEY_${normalizedVersion.toUpperCase()}`,
+      );
+    }
+
+    // 2. Default MFA_ENCRYPTION_KEY if version matches active version or is v1 default
+    const defaultKey = process.env.MFA_ENCRYPTION_KEY;
+    if (defaultKey && defaultKey.trim().length > 0 && defaultKey !== 'undefined') {
+      const activeVersion = this.getActiveKeyVersion();
+      if (normalizedVersion === activeVersion || normalizedVersion === 'v1') {
+        return this.parseAndValidateKey(defaultKey, 'MFA_ENCRYPTION_KEY');
+      }
+    }
+
+    // In production, failure to configure key throws immediately
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `Production MFA failure: No encryption key configured for version "${normalizedVersion}".`,
+      );
+    }
+
+    // Development-only fallback via HKDF from JWT_SECRET
     const secret = process.env.JWT_SECRET;
     if (!secret || secret.length < 32) {
       throw new Error(
@@ -31,13 +134,12 @@ export class MfaService {
       );
     }
 
-    // High-entropy HKDF key derivation with dedicated salt and context info
     return Buffer.from(
       crypto.hkdfSync(
         'sha256',
         secret,
-        'aeo-nexus-mfa-pepper-salt-v1',
-        'mfa-totp-encryption-v1',
+        `aeo-nexus-mfa-pepper-salt-${normalizedVersion}`,
+        `mfa-totp-encryption-${normalizedVersion}`,
         32,
       ),
     );
@@ -46,10 +148,19 @@ export class MfaService {
   /**
    * Derive or obtain the keyed pepper for recovery code hashing.
    */
-  private getRecoveryPepper(): Buffer {
+  getRecoveryPepper(): Buffer {
     const envPepper = process.env.MFA_RECOVERY_PEPPER;
-    if (envPepper && envPepper.trim().length >= 32) {
+    if (envPepper && envPepper.trim().length >= 32 && envPepper !== 'undefined') {
+      if (/^[0-9a-fA-F]{64}$/.test(envPepper.trim())) {
+        return Buffer.from(envPepper.trim(), 'hex');
+      }
       return crypto.createHash('sha256').update(envPepper.trim()).digest();
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Production MFA failure: MFA_RECOVERY_PEPPER is missing or less than 32 characters in production.',
+      );
     }
 
     const secret = process.env.JWT_SECRET;
@@ -77,14 +188,15 @@ export class MfaService {
   /**
    * Encrypt a plaintext Base32 TOTP secret using AES-256-GCM.
    * Generates a unique 96-bit random IV/nonce for each encryption.
-   * Returns format: v1:<iv_hex>:<authTag_hex>:<ciphertext_hex>
+   * Returns format: <version>:<iv_hex>:<authTag_hex>:<ciphertext_hex>
    */
-  encryptSecret(plaintextBase32Secret: string): string {
+  encryptSecret(plaintextBase32Secret: string, targetVersion?: string): string {
     if (!plaintextBase32Secret || plaintextBase32Secret.trim().length === 0) {
       throw new BadRequestException('Cannot encrypt empty MFA secret');
     }
 
-    const key = this.getEncryptionKey(this.CURRENT_KEY_VERSION);
+    const version = (targetVersion || this.getActiveKeyVersion()).toLowerCase();
+    const key = this.getEncryptionKey(version);
     const iv = crypto.randomBytes(12); // 96-bit nonce
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
 
@@ -92,7 +204,7 @@ export class MfaService {
     ciphertext += cipher.final('hex');
     const authTag = cipher.getAuthTag().toString('hex');
 
-    return `${this.CURRENT_KEY_VERSION}:${iv.toString('hex')}:${authTag}:${ciphertext}`;
+    return `${version}:${iv.toString('hex')}:${authTag}:${ciphertext}`;
   }
 
   /**
@@ -107,8 +219,9 @@ export class MfaService {
 
     const trimmed = storedSecret.trim();
 
-    // Check version prefix
-    if (!trimmed.startsWith('v1:')) {
+    // Check version prefix (e.g. v1, v2)
+    const versionMatch = trimmed.match(/^(v\d+):([0-9a-fA-F]{24}):([0-9a-fA-F]{32}):([0-9a-fA-F]+)$/);
+    if (!versionMatch) {
       // Legacy unencrypted Base32 detection (safe backward compatibility during migration)
       if (/^[A-Z2-7=]+$/i.test(trimmed)) {
         return trimmed.toUpperCase();
@@ -116,12 +229,7 @@ export class MfaService {
       throw new UnauthorizedException('Unrecognized or invalid MFA secret payload format');
     }
 
-    const parts = trimmed.split(':');
-    if (parts.length !== 4) {
-      throw new UnauthorizedException('Malformed encrypted MFA secret structure');
-    }
-
-    const [version, ivHex, tagHex, cipherHex] = parts;
+    const [, version, ivHex, tagHex, cipherHex] = versionMatch;
     const key = this.getEncryptionKey(version);
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(tagHex, 'hex');
@@ -354,11 +462,12 @@ export class MfaService {
   /**
    * Verify and find index of a recovery code in stored hashes.
    * Checks both keyed HMAC-SHA256 and legacy SHA-256 for backward compatibility.
+   * Returns isLegacy flag to identify accounts using legacy SHA-256 codes.
    */
   verifyAndConsumeRecoveryCode(
     code: string,
     storedHashedCodes: string[],
-  ): { valid: boolean; matchedHash?: string; remainingHashedCodes: string[] } {
+  ): { valid: boolean; matchedHash?: string; remainingHashedCodes: string[]; isLegacy?: boolean } {
     const normalized = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (normalized.length < 6) {
       return { valid: false, remainingHashedCodes: storedHashedCodes };
@@ -373,6 +482,7 @@ export class MfaService {
     });
 
     let matchedHash = keyedHash;
+    let isLegacy = false;
 
     // Backward compatibility with legacy SHA-256 hashes
     if (index === -1) {
@@ -385,6 +495,7 @@ export class MfaService {
       });
       if (index !== -1) {
         matchedHash = storedHashedCodes[index];
+        isLegacy = true;
       }
     }
 
@@ -394,7 +505,7 @@ export class MfaService {
 
     const remaining = [...storedHashedCodes];
     remaining.splice(index, 1);
-    return { valid: true, matchedHash, remainingHashedCodes: remaining };
+    return { valid: true, matchedHash, remainingHashedCodes: remaining, isLegacy };
   }
 
   /**

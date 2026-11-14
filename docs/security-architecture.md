@@ -33,16 +33,25 @@ Every incoming request must authenticate using high-entropy cryptographic creden
 
 ---
 
-## 3. Multi-Factor Authentication (MFA / 2FA) & Cryptographic Hardening
+## 3. Multi-Factor Authentication (MFA / 2FA) & Operational Hardening
 
-### 3.1 Authenticated Encryption at Rest (AES-256-GCM)
+### 3.1 Authenticated Encryption at Rest (AES-256-GCM) & Key Independence
 - **Algorithm**: AES-256-GCM authenticated encryption for all TOTP secrets stored in PostgreSQL (`mfa_secret`).
 - **Initialization Vector (Nonce)**: 96-bit (12-byte) cryptographically secure random IV generated per encryption operation via `crypto.randomBytes(12)`. IVs are never reused.
 - **Authentication Tag**: 128-bit (16-byte) GCM authentication tag authenticating both ciphertext integrity and payload structure.
 - **Storage Envelope**: Versioned envelope format: `v1:<iv_hex>:<auth_tag_hex>:<ciphertext_hex>`.
-- **Key Management**: Master key derived via HKDF-SHA256 from `JWT_SECRET` with dedicated salt `aeo-nexus-mfa-pepper-salt-v1` and context info `mfa-totp-encryption-v1`, or loaded from explicitly configured `MFA_ENCRYPTION_KEY` environment variable. Plaintext keys and secrets are never logged.
+- **Enforced Production Key Independence**:
+  - In production (`NODE_ENV=production`), `MFA_ENCRYPTION_KEY` is **strictly required** and must be exactly 32 bytes (64 hex characters or 44 Base64 characters).
+  - Production never falls back to deriving MFA keys from `JWT_SECRET`. This guarantees that rotating JWT signing secrets cannot render existing encrypted MFA secrets inaccessible.
+  - Startup checks (`validateProductionKeys()` in `onModuleInit`) immediately abort boot if keys are missing or improperly formatted.
+  - Development fallback is permitted only when `NODE_ENV !== 'production'`.
+- **Multi-Version Key Rotation Strategy**:
+  - Secrets are tagged with an envelope version prefix (`v1:`, `v2:`).
+  - Active version is configured via `MFA_KEY_VERSION` (default `v1`).
+  - The service accepts multi-version keys via `MFA_ENCRYPTION_KEYS` JSON map (`{"v1": "...", "v2": "..."}`).
+  - When rotating keys, existing secrets decrypt cleanly using their version-matched key, while all new encryptions write using the new active key version.
 - **Tamper Resistance**: Tampered ciphertexts or altered authentication tags immediately throw exceptions; silent fallbacks to unencrypted plaintext are strictly prohibited.
-- **Zero-Downtime Migration**: Legacy unencrypted secrets are automatically detected, decrypted, and upgraded in-place to `v1` authenticated encryption on first authentication.
+- **Zero-Downtime Migration**: Legacy unencrypted secrets are automatically detected, decrypted, and upgraded in-place to authenticated encryption on first authentication.
 
 ### 3.2 RFC 6238 TOTP Engine & Counter-Based Replay Protection
 - **Standard**: RFC 6238 Time-Based One-Time Password algorithm with RFC 4648 Base32 secret encoding.
@@ -63,9 +72,13 @@ Every incoming request must authenticate using high-entropy cryptographic creden
   ```
   In concurrent submission race conditions, exactly one transaction succeeds and the duplicate request is rejected.
 
-### 3.3 Keyed Backup Recovery Codes (HMAC-SHA256)
+### 3.3 Keyed Backup Recovery Codes (HMAC-SHA256) & Transparent Migration
 - **Generation**: 10 cryptographically random codes (`XXXXXX-XXXXXX` generated via 6 hex bytes).
-- **Keyed Hashing**: Keyed HMAC-SHA256 using server-side pepper (`MFA_RECOVERY_PEPPER` or derived via HKDF-SHA256 with salt `aeo-nexus-recovery-salt-v1`).
+- **Keyed Hashing**: Keyed HMAC-SHA256 using server-side pepper (`MFA_RECOVERY_PEPPER`, minimum 32 characters).
+- **Transparent Migration Strategy**:
+  - Verifier dynamically checks stored hash format.
+  - Supports both modern HMAC-SHA256 hashes (`hmac:v1:...` and raw HMAC) and legacy unkeyed SHA-256 hashes.
+  - Upon successful verification of a legacy hash, the system consumes the code atomically and flags `isLegacy: true` so the account can be queued for automatic hash upgrading.
 - **Atomic Consumption**: Atomic conditional database array update:
   ```ts
   const updateRes = await prisma.user.updateMany({
@@ -74,12 +87,34 @@ Every incoming request must authenticate using high-entropy cryptographic creden
   });
   if (updateRes.count === 0) throw new UnauthorizedException('Recovery code has already been consumed');
   ```
-  Prevents duplicate consumption races; replayed codes fail verification immediately. Plaintext recovery codes are never stored and are presented to the user only once at enrollment.
+- **Code Regeneration Endpoint**: Authenticated users can generate 10 fresh HMAC-SHA256 recovery codes via `POST /auth/mfa/regenerate-recovery-codes`, invalidating any old recovery codes in a single atomic transaction. Plaintext codes are never stored and returned only once in the HTTP response.
 
-### 3.4 Mandatory Administrator Enforcement & Challenge Token Confinement
-- Administrative platform roles (`PLATFORM_SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPERADMIN`) are barred from password-only sign-in.
-- Unenrolled administrators receive an ephemeral `mfa_setup_challenge` JWT (5-minute expiration) and must complete TOTP enrollment before gaining platform dashboard access.
-- **Challenge Token Confinement**: `JwtAuthGuard` explicitly rejects challenge tokens (`mfa_challenge`, `mfa_setup_challenge`) from accessing any protected resource, returning 401 Unauthorized.
+### 3.4 Persisted One-Time MFA Challenge Lifecycle
+- **Vulnerability Addressed**: In-flight JWT challenges (`mfa_challenge`, `mfa_setup_challenge`) could previously be replayed with subsequent TOTP codes within their 5-minute lifespan.
+- **Persisted Challenge State**: Challenges are stored in `mfa_challenges` table with:
+  - `challengeId`: Cryptographically random unique UUID embedded as `jti` in the challenge JWT.
+  - `userId`: Strict foreign key to `User`.
+  - `purpose`: `MfaChallengePurpose` enum (`MFA_LOGIN` vs `MFA_SETUP`).
+  - `expiresAt`: Short expiration (300 seconds / 5 minutes).
+  - `consumedAt`: Timestamp set atomically on consumption.
+  - `invalidatedAt`: Timestamp set when superseded by new logins or successful auth.
+- **One-Time Atomic Consumption**:
+  ```ts
+  const challengeUpdate = await prisma.mfaChallenge.updateMany({
+    where: {
+      challengeId: payload.jti,
+      userId: user.id,
+      purpose: MfaChallengePurpose.MFA_LOGIN,
+      consumedAt: null,
+      invalidatedAt: null,
+      expiresAt: { gt: now },
+    },
+    data: { consumedAt: now },
+  });
+  if (challengeUpdate.count === 0) throw new UnauthorizedException('MFA challenge has expired, been consumed, or is invalid');
+  ```
+- **Purpose Confusion Prevention**: `mfa_setup_challenge` cannot be submitted to `POST /auth/mfa/login`; `mfa_login` cannot be submitted to setup completion.
+- **Challenge Token Confinement**: `JwtAuthGuard` explicitly rejects challenge tokens from accessing any protected resource, returning 401 Unauthorized.
 - **Zero Session Premature Creation**: Password authentication during MFA challenges creates zero sessions or refresh tokens; session and token creation occurs only upon verified second-factor completion.
 - **Administrative MFA Immutability**: Administrative accounts cannot disable MFA (`disableMfa` throws `BadRequestException: MFA is mandatory for administrative accounts and cannot be disabled`).
 
@@ -140,4 +175,3 @@ The Express HTTP pipeline sets mandatory security headers:
 ### 6.3 DoS & Rate Limiting Protections
 - Express body parsing restricted to `10mb` to protect against payload memory exhaustion.
 - `RateLimiterGuard` active on sensitive authentication endpoints (`login`, `register`, `refresh`, `mfa/login`, `forgot-password`).
-

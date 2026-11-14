@@ -249,12 +249,40 @@ export class AuthService {
     // Administrator MFA Enforcement or user-enabled MFA
     if (user.mfaEnabled || isAdmin) {
       if (!user.mfaEnabled && isAdmin) {
+        const challengeId = crypto.randomUUID();
+        const now = new Date();
+        const expiresAt = new Date(Date.now() + 300 * 1000);
+
+        // Invalidate previous pending setup challenges for this user
+        await this.prisma.mfaChallenge.updateMany({
+          where: {
+            userId: user.id,
+            purpose: 'MFA_SETUP',
+            consumedAt: null,
+            invalidatedAt: null,
+          },
+          data: {
+            invalidatedAt: now,
+          },
+        });
+
+        // Persist one-time MFA setup challenge
+        await this.prisma.mfaChallenge.create({
+          data: {
+            userId: user.id,
+            challengeId,
+            purpose: 'MFA_SETUP',
+            expiresAt,
+          },
+        });
+
         // Force MFA enrollment for admins before production access (short-lived 5-minute challenge)
         const mfaTicket = signJwtHmacSha256(
           {
             sub: user.id,
             email: user.email,
             type: 'mfa_setup_challenge',
+            jti: challengeId,
             exp: Math.floor(Date.now() / 1000) + 300,
           },
           secret,
@@ -344,12 +372,40 @@ export class AuthService {
           throw new UnauthorizedException('Recovery code has already been consumed');
         }
       } else {
+        const challengeId = crypto.randomUUID();
+        const now = new Date();
+        const expiresAt = new Date(Date.now() + 300 * 1000);
+
+        // Invalidate previous pending login challenges for this user
+        await this.prisma.mfaChallenge.updateMany({
+          where: {
+            userId: user.id,
+            purpose: 'MFA_LOGIN',
+            consumedAt: null,
+            invalidatedAt: null,
+          },
+          data: {
+            invalidatedAt: now,
+          },
+        });
+
+        // Persist one-time MFA login challenge
+        await this.prisma.mfaChallenge.create({
+          data: {
+            userId: user.id,
+            challengeId,
+            purpose: 'MFA_LOGIN',
+            expiresAt,
+          },
+        });
+
         // Return MFA challenge (short-lived 5-minute challenge)
         const mfaTicket = signJwtHmacSha256(
           {
             sub: user.id,
             email: user.email,
             type: 'mfa_challenge',
+            jti: challengeId,
             exp: Math.floor(Date.now() / 1000) + 300,
           },
           secret,
@@ -382,9 +438,9 @@ export class AuthService {
     clientInfo?: { ipAddress?: string; userAgent?: string },
   ): Promise<LoginResponse> {
     const secret = this.getJwtSecret();
-    let payload: { sub: string; email: string; type: string };
+    let payload: { sub: string; email: string; type: string; jti?: string };
     try {
-      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string }>(
+      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string; jti?: string }>(
         dto.mfaTicket,
         secret,
       );
@@ -394,6 +450,30 @@ export class AuthService {
 
     if (payload.type !== 'mfa_challenge') {
       throw new UnauthorizedException('Invalid MFA ticket purpose');
+    }
+
+    // Persisted Challenge Lifecycle Verification (One-Time Atomic Conditional Consumption)
+    if (payload.jti) {
+      const now = new Date();
+      const challengeUpdate = await this.prisma.mfaChallenge.updateMany({
+        where: {
+          challengeId: payload.jti,
+          userId: payload.sub,
+          purpose: 'MFA_LOGIN',
+          consumedAt: null,
+          invalidatedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          consumedAt: now,
+        },
+      });
+
+      if (challengeUpdate.count === 0) {
+        throw new UnauthorizedException(
+          'MFA challenge ticket is invalid, expired, or has already been consumed',
+        );
+      }
     }
 
     const user = await this.prisma.user.findUnique({
@@ -474,6 +554,19 @@ export class AuthService {
     } else {
       throw new BadRequestException('MFA verification code or recovery code is required');
     }
+
+    // Invalidate any other active MFA_LOGIN challenges for this user upon successful authentication
+    await this.prisma.mfaChallenge.updateMany({
+      where: {
+        userId: user.id,
+        purpose: 'MFA_LOGIN',
+        consumedAt: null,
+        invalidatedAt: null,
+      },
+      data: {
+        invalidatedAt: new Date(),
+      },
+    });
 
     return this.createSessionAndTokens(user, clientInfo);
   }
@@ -565,15 +658,39 @@ export class AuthService {
     clientInfo?: { ipAddress?: string; userAgent?: string },
   ): Promise<LoginResponse & { recoveryCodes: string[] }> {
     const secret = this.getJwtSecret();
-    let payload: { sub: string; email: string; type: string };
+    let payload: { sub: string; email: string; type: string; jti?: string };
     try {
-      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string }>(ticket, secret);
+      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string; jti?: string }>(ticket, secret);
     } catch {
       throw new UnauthorizedException('Invalid or expired MFA ticket');
     }
 
     if (payload.type !== 'mfa_setup_challenge') {
       throw new UnauthorizedException('Invalid MFA ticket purpose');
+    }
+
+    // Persisted Challenge Lifecycle Verification (One-Time Atomic Conditional Consumption)
+    if (payload.jti) {
+      const now = new Date();
+      const challengeUpdate = await this.prisma.mfaChallenge.updateMany({
+        where: {
+          challengeId: payload.jti,
+          userId: payload.sub,
+          purpose: 'MFA_SETUP',
+          consumedAt: null,
+          invalidatedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          consumedAt: now,
+        },
+      });
+
+      if (challengeUpdate.count === 0) {
+        throw new UnauthorizedException(
+          'MFA setup challenge ticket is invalid, expired, or has already been consumed',
+        );
+      }
     }
 
     const user = await this.prisma.user.findUnique({
@@ -626,8 +743,42 @@ export class AuthService {
       throw new BadRequestException('MFA verification code has already been consumed');
     }
 
+    // Invalidate any other active MFA_SETUP challenges for this user upon enrollment completion
+    await this.prisma.mfaChallenge.updateMany({
+      where: {
+        userId: user.id,
+        purpose: 'MFA_SETUP',
+        consumedAt: null,
+        invalidatedAt: null,
+      },
+      data: {
+        invalidatedAt: new Date(),
+      },
+    });
+
     const loginRes = await this.createSessionAndTokens(user, clientInfo);
     return { ...loginRes, recoveryCodes: plaintextCodes };
+  }
+
+  /**
+   * Regenerate 10 fresh recovery backup codes for an MFA-enrolled user
+   */
+  async regenerateRecoveryCodes(userId: string): Promise<{ recoveryCodes: string[] }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.mfaEnabled) {
+      throw new BadRequestException('MFA is not enabled on this account');
+    }
+
+    const { plaintextCodes, hashedCodes } = this.mfaService.generateRecoveryCodes(10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfaRecoveryCodes: hashedCodes,
+      },
+    });
+
+    return { recoveryCodes: plaintextCodes };
   }
 
   /**

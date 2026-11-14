@@ -215,6 +215,18 @@ export class AuthController {
     };
   }
 
+  @Post('mfa/regenerate-recovery-codes')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async regenerateRecoveryCodes(@Req() req: RequestWithUser) {
+    const result = await this.authService.regenerateRecoveryCodes(req.user.id);
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
