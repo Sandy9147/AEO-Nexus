@@ -26,6 +26,10 @@ This register documents all security findings identified during the Phase 7A, 7A
 | **SEC-OPS-002** | **Multi-Version Key Rotation Support**<br>Lack of structured versioning hindered zero-downtime key rotation for data encrypted at rest. | **High** | `apps/api/src/auth/mfa.service.ts` | Implemented versioned key rotation via `MFA_KEY_VERSION` and `MFA_ENCRYPTION_KEYS` JSON map. Old secrets decrypt using their tagged envelope version; new encryptions write using the active version. | Phase 7A.2 Ops Scenarios 5, 6 | **RESOLVED & VERIFIED** |
 | **SEC-OPS-003** | **Replay of Active In-Flight MFA Challenges**<br>Short-lived JWT challenge tickets could be reused multiple times with subsequent valid TOTP codes during their 5-minute lifespan. | **High** | `apps/api/prisma/schema.prisma`<br>`apps/api/src/auth/auth.service.ts` | Added `mfa_challenges` table in Neon PostgreSQL. Assigned unique cryptographically random UUID `jti` to every challenge. Enforced atomic conditional consumption (`consumedAt: now`) and instant invalidation on authentication success. | Phase 7A.2 Ops Scenarios 7, 8, 9, 10, 11<br>HTTP Scenarios 1, 4, 7 | **RESOLVED & VERIFIED** |
 | **SEC-OPS-004** | **Legacy Recovery Code Migration & Regeneration**<br>Existing users with legacy SHA-256 recovery codes needed safe migration path without losing access. | **Medium** | `apps/api/src/auth/mfa.service.ts`<br>`apps/api/src/auth/auth.service.ts`<br>`apps/api/src/auth/auth.controller.ts` | Built dual verifier handling modern HMAC-SHA256 and legacy SHA-256 codes transparently. Added `POST /auth/mfa/regenerate-recovery-codes` to allow users to generate 10 fresh HMAC-SHA256 codes anytime. | Phase 7A.2 Ops Scenarios 12, 13<br>HTTP Scenarios 8, 10 | **RESOLVED & VERIFIED** |
+| **SEC-P7A3-001** | **Missing or Optional Challenge Identifier (`jti`) Enforcement**<br>MFA challenge tokens lacking `jti` or database verification could potentially bypass one-time consumption checks. | **Critical** | `apps/api/src/auth/auth.service.ts` | Enforced mandatory UUID `jti` validation in `mfaLogin()`, `completeAdminMfaSetup()`, and `initiateAdminMfaSetup()`. Missing, empty, or non-UUID tokens are rejected before querying DB. Verified unconsumed/unexpired DB record and consumed atomically. | Phase 7A.3 Scenarios 1–16 | **RESOLVED & VERIFIED** |
+| **SEC-P7A3-002** | **Step-Up Authentication Gap on Recovery Code Regeneration**<br>Recovery code regeneration did not require password or TOTP re-authentication, allowing compromised access tokens to rotate codes. | **High** | `packages/contracts/src/index.ts`<br>`apps/api/src/auth/auth.service.ts`<br>`apps/api/src/auth/auth.controller.ts` | Added `RegenerateRecoveryCodesRequestSchema` requiring account password and fresh 6-digit TOTP code. Enforced dual verification before generating 10 new HMAC-SHA256 codes. Added rate limiting. | Phase 7A.3 Scenarios 17–20 | **RESOLVED & VERIFIED** |
+| **SEC-P7A3-003** | **Inconsistent Key Rotation & Static Secret Placeholders**<br>Risk of static test keys in `.env.example` or improper parsing of `MFA_ENCRYPTION_KEYS` JSON map. | **Medium** | `apps/api/.env.example`<br>`apps/api/src/auth/mfa.service.ts` | Sanitized `.env.example` with clear placeholders. Added `parseEncryptionKeysJson()` for JSON map support. Strengthened `validateProductionKeys()` to strictly reject placeholders in production. | Phase 7A.3 Scenario 21 | **RESOLVED & VERIFIED** |
+| **SEC-P7A3-004** | **Unverified Administrative MFA Enrollment HTTP Flow**<br>Need for end-to-end integration verification of admin MFA setup initiate and complete endpoints. | **Medium** | `apps/api/src/auth/auth.controller.ts`<br>`apps/api/src/auth/auth.service.ts` | Added `POST /auth/mfa/admin-setup/initiate` endpoint guarded by setup challenge ticket. Linked setup challenge consumption to `POST /auth/mfa/admin-setup/complete`. Verified full HTTP flow. | Phase 7A.3 Scenario 22 | **RESOLVED & VERIFIED** |
 
 ---
 
@@ -33,10 +37,13 @@ This register documents all security findings identified during the Phase 7A, 7A
 - **Phase 7A Baseline Security Findings**: 10 (10/10 Resolved & Verified)
 - **Phase 7A.1 MFA Cryptographic Hardening Findings**: 4 (4/4 Resolved & Verified)
 - **Phase 7A.2 Operational & Challenge Lifecycle Findings**: 4 (4/4 Resolved & Verified)
-- **Automated Test Scenarios Executed**: 70
+- **Phase 7A.3 Challenge Enforcement & Recovery Hardening Findings**: 4 (4/4 Resolved & Verified)
+- **Automated Test Scenarios Executed**: 122
+  - Phase 6C Platform Suite: 30 / 30 Passed
   - Phase 7A Core Security Suite: 30 / 30 Passed
   - Phase 7A.1 Cryptographic Suite: 16 / 16 Passed
   - Phase 7A.2 Operational & Key Rotation Suite: 13 / 13 Passed
   - Phase 7A.2 Real HTTP Integration Suite: 11 / 11 Passed
-- **Test Pass Rate**: 100% (70/70 Passed)
-- **Production Baseline Status**: **APPROVED & CRYPTOGRAPHICALLY HARDENED**
+  - Phase 7A.3 Security Remediation Suite: 22 / 22 Passed
+- **Test Pass Rate**: 100% (122/122 Passed)
+- **Production Baseline Status**: **APPROVED, CRYPTOGRAPHICALLY HARDENED & AUDITED**

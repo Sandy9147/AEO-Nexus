@@ -126,6 +126,34 @@ async function runPhase7a1MfaHardeningSuite() {
   let regularUser: any = null;
   const regularPassword = 'UserSecurePassword123!@#';
 
+  async function issuePersistedChallenge(
+    userId: string,
+    purpose: 'MFA_LOGIN' | 'MFA_SETUP',
+    email: string,
+    expiresInSec: number = 300,
+  ): Promise<string> {
+    const challengeId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + expiresInSec * 1000);
+    await prisma.mfaChallenge.create({
+      data: {
+        userId,
+        challengeId,
+        purpose,
+        expiresAt,
+      },
+    });
+    return signJwtHmacSha256(
+      {
+        sub: userId,
+        email,
+        type: purpose === 'MFA_SETUP' ? 'mfa_setup_challenge' : 'mfa_challenge',
+        jti: challengeId,
+        exp: Math.floor(expiresAt.getTime() / 1000),
+      },
+      jwtSecret,
+    );
+  }
+
   try {
     // -------------------------------------------------------------------------
     // 1. Authenticated Encryption Round-Trip (AES-256-GCM)
@@ -354,15 +382,7 @@ async function runPhase7a1MfaHardeningSuite() {
 
     await recordScenario(7, 'Admin completes initial MFA setup with encrypted secret storage', async () => {
       // 1. Fresh valid setup challenge
-      const validTicket = signJwtHmacSha256(
-        {
-          sub: adminUser.id,
-          email: adminUser.email,
-          type: 'mfa_setup_challenge',
-          exp: Math.floor(Date.now() / 1000) + 300,
-        },
-        jwtSecret,
-      );
+      const validTicket = await issuePersistedChallenge(adminUser.id, 'MFA_SETUP', adminUser.email);
 
       // Generate secret for admin and save encrypted in db
       adminPlainSecret = mfaService.generateSecret();
@@ -399,15 +419,7 @@ async function runPhase7a1MfaHardeningSuite() {
     // -------------------------------------------------------------------------
     await recordScenario(8, 'Immediate replay of same code rejected by counter tracking', async () => {
       // Create fresh login challenge for enrolled admin
-      const challengeTicket = signJwtHmacSha256(
-        {
-          sub: adminUser.id,
-          email: adminUser.email,
-          type: 'mfa_challenge',
-          exp: Math.floor(Date.now() / 1000) + 300,
-        },
-        jwtSecret,
-      );
+      const challengeTicket = await issuePersistedChallenge(adminUser.id, 'MFA_LOGIN', adminUser.email);
 
       // Re-use the exact same code consumed during setup in Scenario 7
       let rejected = false;
@@ -465,14 +477,8 @@ async function runPhase7a1MfaHardeningSuite() {
         },
       });
 
-      const ticket1 = signJwtHmacSha256(
-        { sub: regularUser.id, email: regEmail, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
-      const ticket2 = signJwtHmacSha256(
-        { sub: regularUser.id, email: regEmail, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
+      const ticket1 = await issuePersistedChallenge(regularUser.id, 'MFA_LOGIN', regEmail);
+      const ticket2 = await issuePersistedChallenge(regularUser.id, 'MFA_LOGIN', regEmail);
 
       const code = mfaService.computeTotp(regPlainSecret);
 
@@ -496,10 +502,7 @@ async function runPhase7a1MfaHardeningSuite() {
     // 11. Single-Use Recovery Code Login & Consumption
     // -------------------------------------------------------------------------
     await recordScenario(11, 'Recovery code login decrements remaining codes in database', async () => {
-      const ticket = signJwtHmacSha256(
-        { sub: adminUser.id, email: adminUser.email, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
+      const ticket = await issuePersistedChallenge(adminUser.id, 'MFA_LOGIN', adminUser.email);
 
       const userBefore = await prisma.user.findUnique({ where: { id: adminUser.id } });
       const initialCount = userBefore?.mfaRecoveryCodes?.length || 0;
@@ -526,10 +529,7 @@ async function runPhase7a1MfaHardeningSuite() {
     // 12. Recovery Code Replay Rejection
     // -------------------------------------------------------------------------
     await recordScenario(12, 'Replaying consumed recovery code is rejected', async () => {
-      const ticket = signJwtHmacSha256(
-        { sub: adminUser.id, email: adminUser.email, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
+      const ticket = await issuePersistedChallenge(adminUser.id, 'MFA_LOGIN', adminUser.email);
 
       const usedCode = adminRecoveryCodes[0];
       let rejected = false;
@@ -554,14 +554,8 @@ async function runPhase7a1MfaHardeningSuite() {
     await recordScenario(13, 'Concurrent recovery code submissions: exactly one succeeds, second fails', async () => {
       // Use recovery code 1
       const testCode = adminRecoveryCodes[1];
-      const ticketA = signJwtHmacSha256(
-        { sub: adminUser.id, email: adminUser.email, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
-      const ticketB = signJwtHmacSha256(
-        { sub: adminUser.id, email: adminUser.email, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
+      const ticketA = await issuePersistedChallenge(adminUser.id, 'MFA_LOGIN', adminUser.email);
+      const ticketB = await issuePersistedChallenge(adminUser.id, 'MFA_LOGIN', adminUser.email);
 
       const [resA, resB] = await Promise.allSettled([
         authService.mfaLogin({ mfaTicket: ticketA, recoveryCode: testCode }),
@@ -664,10 +658,7 @@ async function runPhase7a1MfaHardeningSuite() {
 
       // Perform login check which triggers auto-upgrade in-place
       const code = mfaService.computeTotp(legacySecret);
-      const ticket = signJwtHmacSha256(
-        { sub: legacyUser.id, email: legacyUser.email, type: 'mfa_challenge', exp: Math.floor(Date.now() / 1000) + 300 },
-        jwtSecret,
-      );
+      const ticket = await issuePersistedChallenge(legacyUser.id, 'MFA_LOGIN', legacyUser.email);
 
       const loginRes = await authService.mfaLogin({
         mfaTicket: ticket,

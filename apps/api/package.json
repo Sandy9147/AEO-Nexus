@@ -19,7 +19,8 @@
     "test:phase7a": "ts-node scripts/test-phase7a-security-suite.ts",
     "test:phase7a1": "ts-node scripts/test-phase7a1-mfa-hardening-suite.ts",
     "test:phase7a2-ops": "ts-node scripts/test-phase7a2-mfa-operational-suite.ts",
-    "test:phase7a2-http": "ts-node scripts/test-phase7a2-http-integration-suite.ts"
+    "test:phase7a2-http": "ts-node scripts/test-phase7a2-http-integration-suite.ts",
+    "test:phase7a3": "ts-node scripts/test-phase7a3-remediation-suite.ts"
   },
   "dependencies": {
     "@aeo-nexus/ai": "workspace:*",

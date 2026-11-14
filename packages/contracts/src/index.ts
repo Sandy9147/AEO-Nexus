@@ -75,6 +75,17 @@ export const MfaDisableRequestSchema = z.object({
 });
 export type MfaDisableRequest = z.infer<typeof MfaDisableRequestSchema>;
 
+export const RegenerateRecoveryCodesRequestSchema = z.object({
+  password: z.string().min(1, 'Password is required for step-up authentication'),
+  code: z.string().min(6, 'MFA verification code is required for step-up authentication'),
+});
+export type RegenerateRecoveryCodesRequest = z.infer<typeof RegenerateRecoveryCodesRequestSchema>;
+
+export const AdminSetupInitiateRequestSchema = z.object({
+  ticket: z.string().min(1, 'MFA setup ticket is required'),
+});
+export type AdminSetupInitiateRequest = z.infer<typeof AdminSetupInitiateRequestSchema>;
+
 export const RegisterRequestSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters long'),

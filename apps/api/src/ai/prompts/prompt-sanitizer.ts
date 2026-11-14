@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex */
 import { Logger } from '@nestjs/common';
 
 const SUSPICIOUS_INJECTION_PATTERNS = [

@@ -231,17 +231,34 @@ async function runPhase7a2HttpIntegrationSuite() {
     });
 
     // -------------------------------------------------------------------------
-    // 3. POST /auth/mfa/admin-setup - Live Enrollment
+    // 3. Genuine Admin MFA Enrollment Lifecycle (No Manual DB Injection)
     // -------------------------------------------------------------------------
-    await recordScenario(3, 'POST /auth/mfa/admin-setup verifies TOTP, returns tokens, and sets refresh cookie', async () => {
-      adminPlainSecret = mfaService.generateSecret();
-      await prisma.user.update({
-        where: { id: testAdminUser.id },
-        data: { mfaSecret: mfaService.encryptSecret(adminPlainSecret) },
+    await recordScenario(3, 'POST /auth/mfa/admin-setup/initiate & completeAdminMfaSetup live enrollment lifecycle', async () => {
+      // 1. Obtain setup secret through the genuine initiate endpoint
+      const initRes = await fetch(`${baseUrl}/auth/mfa/admin-setup/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: adminSetupTicket }),
       });
 
+      if (initRes.status !== 200) {
+        throw new Error(`Expected HTTP 200 from admin-setup/initiate, got ${initRes.status}: ${await initRes.text()}`);
+      }
+
+      const initBody = await initRes.json();
+      if (!initBody.data?.secret || !initBody.data?.otpauthUri) {
+        throw new Error(`Initiate response missing secret or otpauthUri: ${JSON.stringify(initBody)}`);
+      }
+
+      adminPlainSecret = initBody.data.secret;
+      if (!initBody.data.otpauthUri.startsWith('otpauth://totp/')) {
+        throw new Error(`Invalid otpauthUri prefix: ${initBody.data.otpauthUri}`);
+      }
+
+      // 2. Generate valid TOTP code from the obtained secret
       const validCode = mfaService.computeTotp(adminPlainSecret);
 
+      // 3. Complete enrollment through the real HTTP endpoint
       const res = await fetch(`${baseUrl}/auth/mfa/admin-setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -264,13 +281,24 @@ async function runPhase7a2HttpIntegrationSuite() {
       adminRecoveryCodes = body.data.recoveryCodes;
       if (adminRecoveryCodes.length !== 10) throw new Error('Expected 10 recovery codes');
 
+      // 4. Verify user in database: MFA is enabled and encrypted
+      const dbUser = await prisma.user.findUnique({ where: { id: testAdminUser.id } });
+      if (!dbUser?.mfaEnabled) throw new Error('User mfaEnabled was not set to true in DB');
+      if (!dbUser?.mfaSecret || !dbUser.mfaSecret.startsWith('v1:')) {
+        throw new Error('User mfaSecret is missing or not encrypted with version envelope');
+      }
+
+      // 5. Verify a session is created in DB only after successful enrollment
+      const sessionCount = await prisma.session.count({ where: { userId: testAdminUser.id } });
+      if (sessionCount !== 1) throw new Error(`Expected exactly 1 session in DB, found ${sessionCount}`);
+
       // Verify Set-Cookie header contains refreshToken
       const cookieHeader = res.headers.get('set-cookie');
       if (!cookieHeader || (!cookieHeader.includes('aeo_nexus_refresh_token=') && !cookieHeader.includes('refreshToken='))) {
         throw new Error(`Set-Cookie header missing refreshToken: ${cookieHeader}`);
       }
 
-      return { details: 'HTTP 200, access token issued, 10 recovery codes returned, refresh cookie set' };
+      return { details: 'Genuine enrollment lifecycle verified: initiate -> TOTP compute -> complete -> DB verified' };
     });
 
     // -------------------------------------------------------------------------
@@ -437,14 +465,24 @@ async function runPhase7a2HttpIntegrationSuite() {
     });
 
     // -------------------------------------------------------------------------
-    // 10. POST /auth/mfa/regenerate-recovery-codes
+    // 10. POST /auth/mfa/regenerate-recovery-codes (Step-Up Authentication)
     // -------------------------------------------------------------------------
-    await recordScenario(10, 'POST /auth/mfa/regenerate-recovery-codes returns 10 fresh codes over HTTP', async () => {
+    await recordScenario(10, 'POST /auth/mfa/regenerate-recovery-codes returns 10 fresh codes over HTTP with step-up auth', async () => {
+      await prisma.user.update({
+        where: { id: testAdminUser.id },
+        data: { mfaLastUsedStep: null },
+      });
+      const validTotp = mfaService.computeTotp(adminPlainSecret);
       const res = await fetch(`${baseUrl}/auth/mfa/regenerate-recovery-codes`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${adminAccessToken}`,
         },
+        body: JSON.stringify({
+          password: adminPassword,
+          code: validTotp,
+        }),
       });
 
       if (res.status !== 200) {

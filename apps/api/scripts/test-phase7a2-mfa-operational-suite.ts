@@ -368,12 +368,7 @@ async function runPhase7a2OperationalSuite() {
         password: adminPassword,
       });
       adminSetupTicket = loginRes.mfaTicket;
-
-      adminPlainSecret = mfaService.generateSecret();
-      await prisma.user.update({
-        where: { id: testAdminUser.id },
-        data: { mfaSecret: mfaService.encryptSecret(adminPlainSecret) },
-      });
+      adminPlainSecret = loginRes.secret || (await authService.initiateAdminMfaSetup(adminSetupTicket)).secret;
 
       const validCode = mfaService.computeTotp(adminPlainSecret);
 
@@ -559,10 +554,15 @@ async function runPhase7a2OperationalSuite() {
     });
 
     // -------------------------------------------------------------------------
-    // 13. Recovery Code Regeneration Lifecycle
+    // 13. Recovery Code Regeneration Lifecycle (Step-Up Authentication)
     // -------------------------------------------------------------------------
-    await recordScenario(13, 'User can regenerate 10 fresh recovery codes atomically replacing old codes', async () => {
-      const regenRes = await authService.regenerateRecoveryCodes(testRegularUser.id);
+    await recordScenario(13, 'User can regenerate 10 fresh recovery codes atomically with step-up auth', async () => {
+      const regPlainSecret = mfaService.decryptSecret(testRegularUser.mfaSecret!);
+      const validCode = mfaService.computeTotp(regPlainSecret);
+      const regenRes = await authService.regenerateRecoveryCodes(testRegularUser.id, {
+        password: regularPassword,
+        code: validCode,
+      });
       if (!regenRes.recoveryCodes || regenRes.recoveryCodes.length !== 10) {
         throw new Error(`Expected 10 regenerated codes, got ${regenRes.recoveryCodes?.length}`);
       }

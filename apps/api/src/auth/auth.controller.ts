@@ -26,6 +26,8 @@ import {
   MfaLoginRequest,
   MfaVerifyRequest,
   MfaDisableRequest,
+  RegenerateRecoveryCodesRequest,
+  AdminSetupInitiateRequest,
 } from '@aeo-nexus/contracts';
 import { REFRESH_COOKIE_NAME, REFRESH_TOKEN_TTL_SECONDS } from '@aeo-nexus/auth';
 
@@ -132,6 +134,19 @@ export class AuthController {
     };
   }
 
+  @Post('mfa/admin-setup/initiate')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimiterGuard)
+  @RateLimit(10, 60)
+  async adminMfaSetupInitiate(@Body() body: AdminSetupInitiateRequest) {
+    const result = await this.authService.initiateAdminMfaSetup(body.ticket);
+    return {
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Post('mfa/admin-setup')
   @HttpCode(HttpStatus.OK)
   @UseGuards(RateLimiterGuard)
@@ -217,9 +232,13 @@ export class AuthController {
 
   @Post('mfa/regenerate-recovery-codes')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  async regenerateRecoveryCodes(@Req() req: RequestWithUser) {
-    const result = await this.authService.regenerateRecoveryCodes(req.user.id);
+  @UseGuards(JwtAuthGuard, RateLimiterGuard)
+  @RateLimit(5, 60)
+  async regenerateRecoveryCodes(
+    @Req() req: RequestWithUser,
+    @Body() body: RegenerateRecoveryCodesRequest,
+  ) {
+    const result = await this.authService.regenerateRecoveryCodes(req.user.id, body);
     return {
       success: true,
       data: result,

@@ -17,45 +17,132 @@ export class MfaService implements OnModuleInit {
   }
 
   /**
+   * Parse the MFA_ENCRYPTION_KEYS JSON map if configured.
+   * Format: {"v1": "64_hex_chars...", "v2": "44_base64_chars..."}
+   */
+  parseEncryptionKeysJson(jsonString?: string): Map<string, Buffer> {
+    const raw = jsonString ?? process.env.MFA_ENCRYPTION_KEYS;
+    const map = new Map<string, Buffer>();
+    if (!raw || raw.trim().length === 0 || raw === 'undefined') {
+      return map;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e: any) {
+      throw new Error(`Invalid MFA_ENCRYPTION_KEYS: Malformed JSON (${e.message})`);
+    }
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('Invalid MFA_ENCRYPTION_KEYS: Must be a JSON object mapping versions to 32-byte keys.');
+    }
+
+    for (const [version, keyVal] of Object.entries(parsed as Record<string, unknown>)) {
+      const normalizedVersion = version.trim().toLowerCase();
+      if (!normalizedVersion || !/^v\d+$/i.test(normalizedVersion)) {
+        throw new Error(`Invalid key version identifier in MFA_ENCRYPTION_KEYS: "${version}". Expected format like "v1", "v2".`);
+      }
+      if (typeof keyVal !== 'string') {
+        throw new Error(`Invalid key for version "${version}" in MFA_ENCRYPTION_KEYS: Value must be a string.`);
+      }
+      const keyBuffer = this.parseAndValidateKey(keyVal, `MFA_ENCRYPTION_KEYS["${version}"]`);
+      map.set(normalizedVersion, keyBuffer);
+    }
+
+    return map;
+  }
+
+  /**
    * Validate production keys on startup or readiness verification.
    * In production (NODE_ENV === 'production'), strict independent keys are mandatory.
-   * Throws an Error if required keys are missing or invalid, halting startup safely.
+   * Placeholders or development defaults are strictly rejected in production.
+   * Throws an Error if required keys are missing, invalid, or using placeholders.
    */
   validateProductionKeys(): void {
     const isProd = process.env.NODE_ENV === 'production';
-
-    // 1. Encryption Key Validation
     const encKey = process.env.MFA_ENCRYPTION_KEY;
+    const encKeysJson = process.env.MFA_ENCRYPTION_KEYS;
+    const recoveryPepper = process.env.MFA_RECOVERY_PEPPER;
+    const activeVersion = this.getActiveKeyVersion();
+
+    const isPlaceholder = (val?: string) => {
+      if (!val) return false;
+      const lower = val.toLowerCase().trim();
+      return (
+        lower.includes('replace_with') ||
+        lower.includes('0123456789abcdef0123456789abcdef') ||
+        lower.startsWith('dev_') ||
+        lower.includes('placeholder') ||
+        lower.includes('change_in_production')
+      );
+    };
+
+    // If MFA_ENCRYPTION_KEYS is provided, validate JSON structure and key formats
+    if (encKeysJson && encKeysJson.trim().length > 0 && encKeysJson !== 'undefined') {
+      this.parseEncryptionKeysJson(encKeysJson);
+    }
+
     if (isProd) {
-      if (!encKey || encKey.trim().length === 0 || encKey === 'undefined') {
+      // 1. Placeholder checks
+      if (isPlaceholder(encKey)) {
+        throw new Error(
+          'FATAL CONFIGURATION ERROR: MFA_ENCRYPTION_KEY contains a placeholder or development default in production!',
+        );
+      }
+      if (isPlaceholder(recoveryPepper)) {
+        throw new Error(
+          'FATAL CONFIGURATION ERROR: MFA_RECOVERY_PEPPER contains a placeholder or development default in production!',
+        );
+      }
+
+      // 2. Ensure active key is configured and valid
+      const hasDirectEncKey = encKey && encKey.trim().length > 0 && encKey !== 'undefined';
+      const hasKeysJson = encKeysJson && encKeysJson.trim().length > 0 && encKeysJson !== 'undefined';
+
+      if (!hasDirectEncKey && !hasKeysJson) {
         throw new Error(
           'FATAL CONFIGURATION ERROR: MFA_ENCRYPTION_KEY is required in production. ' +
           'Must be a 64-character hexadecimal or 44-character base64 string (32 bytes).',
         );
       }
-      this.parseAndValidateKey(encKey, 'MFA_ENCRYPTION_KEY');
-    } else if (encKey && encKey.trim().length > 0 && encKey !== 'undefined') {
-      this.parseAndValidateKey(encKey, 'MFA_ENCRYPTION_KEY');
-    } else {
-      this.logger.warn(
-        '[SECURITY NOTICE] MFA_ENCRYPTION_KEY not set. Falling back to development HKDF key derivation. ' +
-        'DO NOT RUN IN PRODUCTION WITHOUT AN EXPLICIT MFA_ENCRYPTION_KEY.',
-      );
-    }
 
-    // 2. Recovery Pepper Validation
-    const recoveryPepper = process.env.MFA_RECOVERY_PEPPER;
-    if (isProd) {
+      let hasActiveKey = false;
+      try {
+        const keyBuf = this.getEncryptionKey(activeVersion);
+        if (keyBuf && keyBuf.length === 32) {
+          hasActiveKey = true;
+        }
+      } catch {
+        hasActiveKey = false;
+      }
+
+      if (!hasActiveKey) {
+        throw new Error(
+          `FATAL CONFIGURATION ERROR: MFA_ENCRYPTION_KEY is required in production. Active key for version "${activeVersion}" is not configured. ` +
+          `Set MFA_ENCRYPTION_KEY or configure "${activeVersion}" in MFA_ENCRYPTION_KEYS JSON map.`,
+        );
+      }
+
+      // 3. Recovery Pepper Validation
       if (!recoveryPepper || recoveryPepper.trim().length < 32 || recoveryPepper === 'undefined') {
         throw new Error(
           'FATAL CONFIGURATION ERROR: MFA_RECOVERY_PEPPER is required in production and must be at least 32 characters.',
         );
       }
-    } else if (!recoveryPepper || recoveryPepper === 'undefined') {
-      this.logger.warn(
-        '[SECURITY NOTICE] MFA_RECOVERY_PEPPER not set. Falling back to development HKDF pepper derivation. ' +
-        'DO NOT RUN IN PRODUCTION WITHOUT AN EXPLICIT MFA_RECOVERY_PEPPER.',
-      );
+    } else {
+      if (!encKey && (!encKeysJson || encKeysJson === 'undefined')) {
+        this.logger.warn(
+          '[SECURITY NOTICE] MFA_ENCRYPTION_KEY / MFA_ENCRYPTION_KEYS not set. Falling back to development HKDF key derivation. ' +
+          'DO NOT RUN IN PRODUCTION WITHOUT AN EXPLICIT MFA_ENCRYPTION_KEY.',
+        );
+      }
+      if (!recoveryPepper || recoveryPepper === 'undefined') {
+        this.logger.warn(
+          '[SECURITY NOTICE] MFA_RECOVERY_PEPPER not set. Falling back to development HKDF pepper derivation. ' +
+          'DO NOT RUN IN PRODUCTION WITHOUT AN EXPLICIT MFA_RECOVERY_PEPPER.',
+        );
+      }
     }
   }
 
@@ -94,20 +181,24 @@ export class MfaService implements OnModuleInit {
 
   /**
    * Obtain the 256-bit encryption key for the given version.
-   * Supports multi-version key rotation:
-   * e.g. v1 -> MFA_ENCRYPTION_KEY_V1 (or MFA_ENCRYPTION_KEY fallback)
-   *      v2 -> MFA_ENCRYPTION_KEY_V2 (or MFA_ENCRYPTION_KEY if active is v2)
+   * Priority:
+   * 1. MFA_ENCRYPTION_KEYS JSON map (e.g. {"v1": "...", "v2": "..."})
+   * 2. MFA_ENCRYPTION_KEY if version matches active version or is v1 default
+   * 3. Version-specific env var (e.g. MFA_ENCRYPTION_KEY_V1)
    */
   getEncryptionKey(version = 'v1'): Buffer {
-    const normalizedVersion = version.toLowerCase();
+    const normalizedVersion = version.toLowerCase().trim();
 
-    // 1. Version-specific environment key: MFA_ENCRYPTION_KEY_V1, MFA_ENCRYPTION_KEY_V2
-    const versionKey = process.env[`MFA_ENCRYPTION_KEY_${normalizedVersion.toUpperCase()}`];
-    if (versionKey && versionKey.trim().length > 0) {
-      return this.parseAndValidateKey(
-        versionKey,
-        `MFA_ENCRYPTION_KEY_${normalizedVersion.toUpperCase()}`,
-      );
+    // 1. Check MFA_ENCRYPTION_KEYS JSON map
+    try {
+      const jsonMap = this.parseEncryptionKeysJson();
+      if (jsonMap.has(normalizedVersion)) {
+        return jsonMap.get(normalizedVersion)!;
+      }
+    } catch (e: any) {
+      if (process.env.NODE_ENV === 'production') {
+        throw e;
+      }
     }
 
     // 2. Default MFA_ENCRYPTION_KEY if version matches active version or is v1 default
@@ -117,6 +208,15 @@ export class MfaService implements OnModuleInit {
       if (normalizedVersion === activeVersion || normalizedVersion === 'v1') {
         return this.parseAndValidateKey(defaultKey, 'MFA_ENCRYPTION_KEY');
       }
+    }
+
+    // 3. Version-specific environment key: MFA_ENCRYPTION_KEY_V1, MFA_ENCRYPTION_KEY_V2
+    const versionKey = process.env[`MFA_ENCRYPTION_KEY_${normalizedVersion.toUpperCase()}`];
+    if (versionKey && versionKey.trim().length > 0 && versionKey !== 'undefined') {
+      return this.parseAndValidateKey(
+        versionKey,
+        `MFA_ENCRYPTION_KEY_${normalizedVersion.toUpperCase()}`,
+      );
     }
 
     // In production, failure to configure key throws immediately

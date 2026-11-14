@@ -87,18 +87,26 @@ Every incoming request must authenticate using high-entropy cryptographic creden
   });
   if (updateRes.count === 0) throw new UnauthorizedException('Recovery code has already been consumed');
   ```
-- **Code Regeneration Endpoint**: Authenticated users can generate 10 fresh HMAC-SHA256 recovery codes via `POST /auth/mfa/regenerate-recovery-codes`, invalidating any old recovery codes in a single atomic transaction. Plaintext codes are never stored and returned only once in the HTTP response.
+- **Step-Up Authentication on Code Regeneration**: Authenticated users can generate 10 fresh HMAC-SHA256 recovery codes via `POST /auth/mfa/regenerate-recovery-codes`. To prevent session hijackers or malicious actors from rotating recovery codes, the endpoint enforces **step-up authentication** requiring:
+  1. The user's current account `password` (verified with `bcrypt.compare`).
+  2. A fresh, valid 6-digit TOTP `code` (verified against the decrypted TOTP secret and protected against time-step replay).
+  3. Strict rate limiting (`@RateLimit(5, 60)`).
+  Upon successful dual verification, any old recovery codes are invalidated and 10 fresh HMAC-SHA256 codes are generated and stored in a single atomic transaction. Plaintext codes are returned only once in the HTTP response and never logged or persisted.
 
-### 3.4 Persisted One-Time MFA Challenge Lifecycle
-- **Vulnerability Addressed**: In-flight JWT challenges (`mfa_challenge`, `mfa_setup_challenge`) could previously be replayed with subsequent TOTP codes within their 5-minute lifespan.
-- **Persisted Challenge State**: Challenges are stored in `mfa_challenges` table with:
+### 3.4 Persisted One-Time MFA Challenge Lifecycle & Mandatory Identifier Enforcement
+- **Vulnerability Addressed**: In-flight JWT challenges (`mfa_challenge`, `mfa_setup_challenge`) could previously be replayed with subsequent TOTP codes within their 5-minute lifespan, or tokens lacking a `jti` claim could evade database one-time checks.
+- **Mandatory Challenge Identifier (`jti`) Validation**:
+  - The `jti` claim is strictly mandatory in all MFA challenge tokens presented to `mfaLogin()`, `completeAdminMfaSetup()`, and `initiateAdminMfaSetup()`.
+  - Format must strictly match canonical UUID format (`/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`).
+  - Missing, empty, malformed, or non-UUID tokens are rejected immediately with `401 Unauthorized` before querying the database.
+- **Persisted Challenge State**: Challenges are stored in the Neon PostgreSQL `mfa_challenges` table with:
   - `challengeId`: Cryptographically random unique UUID embedded as `jti` in the challenge JWT.
   - `userId`: Strict foreign key to `User`.
   - `purpose`: `MfaChallengePurpose` enum (`MFA_LOGIN` vs `MFA_SETUP`).
   - `expiresAt`: Short expiration (300 seconds / 5 minutes).
   - `consumedAt`: Timestamp set atomically on consumption.
   - `invalidatedAt`: Timestamp set when superseded by new logins or successful auth.
-- **One-Time Atomic Consumption**:
+- **One-Time Atomic Conditional Consumption**:
   ```ts
   const challengeUpdate = await prisma.mfaChallenge.updateMany({
     where: {
@@ -113,6 +121,11 @@ Every incoming request must authenticate using high-entropy cryptographic creden
   });
   if (challengeUpdate.count === 0) throw new UnauthorizedException('MFA challenge has expired, been consumed, or is invalid');
   ```
+  Failed verification attempts immediately set `invalidatedAt: now`, rendering the challenge unusable for further attempts.
+- **Full Administrator MFA Enrollment Flow**:
+  1. `POST /auth/login` for an admin user without MFA returns `mfa_setup_challenge` JWT containing a persisted `jti`.
+  2. `POST /auth/mfa/admin-setup/initiate` validates the setup ticket, verifies unconsumed state, and returns Base32 secret, QR code data URL, and 10 HMAC recovery codes.
+  3. `POST /auth/mfa/admin-setup/complete` verifies the TOTP code, atomically consumes the setup challenge, encrypts the secret with AES-256-GCM, stores the recovery codes, and marks `mfaEnabled: true`.
 - **Purpose Confusion Prevention**: `mfa_setup_challenge` cannot be submitted to `POST /auth/mfa/login`; `mfa_login` cannot be submitted to setup completion.
 - **Challenge Token Confinement**: `JwtAuthGuard` explicitly rejects challenge tokens from accessing any protected resource, returning 401 Unauthorized.
 - **Zero Session Premature Creation**: Password authentication during MFA challenges creates zero sessions or refresh tokens; session and token creation occurs only upon verified second-factor completion.

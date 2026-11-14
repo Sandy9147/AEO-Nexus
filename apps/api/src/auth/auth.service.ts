@@ -16,6 +16,7 @@ import {
   MfaLoginRequest,
   MfaVerifyRequest,
   MfaDisableRequest,
+  RegenerateRecoveryCodesRequest,
   UserProfile,
   SessionInfo,
 } from '@aeo-nexus/contracts';
@@ -50,6 +51,21 @@ export class AuthService {
       );
     }
     return secret;
+  }
+
+  /**
+   * Validate that a challenge jti is a non-empty, valid UUID identifier.
+   */
+  private validateChallengeId(jti: unknown): string {
+    if (!jti || typeof jti !== 'string') {
+      throw new UnauthorizedException('MFA challenge identifier is missing or malformed');
+    }
+    const trimmed = jti.trim();
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (trimmed.length === 0 || !UUID_REGEX.test(trimmed)) {
+      throw new UnauthorizedException('MFA challenge identifier is missing or malformed');
+    }
+    return trimmed;
   }
 
   /**
@@ -276,6 +292,29 @@ export class AuthService {
           },
         });
 
+        // Initialize setup secret for administrator if not already generated
+        let adminSecret = '';
+        if (user.mfaSecret) {
+          try {
+            adminSecret = this.mfaService.decryptSecret(user.mfaSecret);
+          } catch {
+            adminSecret = this.mfaService.generateSecret();
+          }
+        } else {
+          adminSecret = this.mfaService.generateSecret();
+        }
+
+        const encryptedSecret = this.mfaService.encryptSecret(adminSecret);
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            mfaSecret: encryptedSecret,
+            mfaLastUsedStep: null,
+            mfaLastUsedCode: null,
+          },
+        });
+        const otpauthUri = this.mfaService.getOtpAuthUri(adminSecret, user.email);
+
         // Force MFA enrollment for admins before production access (short-lived 5-minute challenge)
         const mfaTicket = signJwtHmacSha256(
           {
@@ -292,6 +331,8 @@ export class AuthService {
           mfaRequired: true,
           mfaSetupRequired: true,
           mfaTicket,
+          secret: adminSecret,
+          otpauthUri,
           message:
             'MFA is mandatory for administrative accounts. Please set up MFA to complete login.',
           user: {
@@ -453,27 +494,26 @@ export class AuthService {
     }
 
     // Persisted Challenge Lifecycle Verification (One-Time Atomic Conditional Consumption)
-    if (payload.jti) {
-      const now = new Date();
-      const challengeUpdate = await this.prisma.mfaChallenge.updateMany({
-        where: {
-          challengeId: payload.jti,
-          userId: payload.sub,
-          purpose: 'MFA_LOGIN',
-          consumedAt: null,
-          invalidatedAt: null,
-          expiresAt: { gt: now },
-        },
-        data: {
-          consumedAt: now,
-        },
-      });
+    const challengeId = this.validateChallengeId(payload.jti);
+    const now = new Date();
+    const challengeUpdate = await this.prisma.mfaChallenge.updateMany({
+      where: {
+        challengeId,
+        userId: payload.sub,
+        purpose: 'MFA_LOGIN',
+        consumedAt: null,
+        invalidatedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: {
+        consumedAt: now,
+      },
+    });
 
-      if (challengeUpdate.count === 0) {
-        throw new UnauthorizedException(
-          'MFA challenge ticket is invalid, expired, or has already been consumed',
-        );
-      }
+    if (challengeUpdate.count === 0) {
+      throw new UnauthorizedException(
+        'MFA challenge ticket is invalid, expired, or has already been consumed',
+      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -670,27 +710,26 @@ export class AuthService {
     }
 
     // Persisted Challenge Lifecycle Verification (One-Time Atomic Conditional Consumption)
-    if (payload.jti) {
-      const now = new Date();
-      const challengeUpdate = await this.prisma.mfaChallenge.updateMany({
-        where: {
-          challengeId: payload.jti,
-          userId: payload.sub,
-          purpose: 'MFA_SETUP',
-          consumedAt: null,
-          invalidatedAt: null,
-          expiresAt: { gt: now },
-        },
-        data: {
-          consumedAt: now,
-        },
-      });
+    const challengeId = this.validateChallengeId(payload.jti);
+    const now = new Date();
+    const challengeUpdate = await this.prisma.mfaChallenge.updateMany({
+      where: {
+        challengeId,
+        userId: payload.sub,
+        purpose: 'MFA_SETUP',
+        consumedAt: null,
+        invalidatedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: {
+        consumedAt: now,
+      },
+    });
 
-      if (challengeUpdate.count === 0) {
-        throw new UnauthorizedException(
-          'MFA setup challenge ticket is invalid, expired, or has already been consumed',
-        );
-      }
+    if (challengeUpdate.count === 0) {
+      throw new UnauthorizedException(
+        'MFA setup challenge ticket is invalid, expired, or has already been consumed',
+      );
     }
 
     const user = await this.prisma.user.findUnique({
@@ -761,22 +800,127 @@ export class AuthService {
   }
 
   /**
-   * Regenerate 10 fresh recovery backup codes for an MFA-enrolled user
+   * Initiate MFA setup for an unenrolled administrator presenting an active mfa_setup_challenge ticket.
+   * Returns the Base32 setup secret and otpauth URI.
    */
-  async regenerateRecoveryCodes(userId: string): Promise<{ recoveryCodes: string[] }> {
+  async initiateAdminMfaSetup(ticket: string): Promise<{ secret: string; otpauthUri: string }> {
+    const secret = this.getJwtSecret();
+    let payload: { sub: string; email: string; type: string; jti?: string };
+    try {
+      payload = verifyJwtHmacSha256<{ sub: string; email: string; type: string; jti?: string }>(ticket, secret);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired MFA setup ticket');
+    }
+
+    if (payload.type !== 'mfa_setup_challenge') {
+      throw new UnauthorizedException('Invalid MFA ticket purpose');
+    }
+
+    const challengeId = this.validateChallengeId(payload.jti);
+
+    const challenge = await this.prisma.mfaChallenge.findFirst({
+      where: {
+        challengeId,
+        userId: payload.sub,
+        purpose: 'MFA_SETUP',
+        consumedAt: null,
+        invalidatedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!challenge) {
+      throw new UnauthorizedException(
+        'MFA setup challenge ticket is invalid, expired, or has already been consumed',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found or deactivated');
+    }
+
+    let plaintextSecret = '';
+    if (user.mfaSecret) {
+      try {
+        plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
+      } catch {
+        plaintextSecret = this.mfaService.generateSecret();
+      }
+    } else {
+      plaintextSecret = this.mfaService.generateSecret();
+    }
+
+    const encryptedSecret = this.mfaService.encryptSecret(plaintextSecret);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaSecret: encryptedSecret,
+        mfaLastUsedStep: null,
+        mfaLastUsedCode: null,
+      },
+    });
+
+    const otpauthUri = this.mfaService.getOtpAuthUri(plaintextSecret, user.email);
+    return { secret: plaintextSecret, otpauthUri };
+  }
+
+  /**
+   * Regenerate 10 fresh recovery backup codes for an MFA-enrolled user with step-up authentication.
+   * Requires user's current password and fresh valid TOTP verification code.
+   */
+  async regenerateRecoveryCodes(
+    userId: string,
+    dto: RegenerateRecoveryCodesRequest,
+  ): Promise<{ recoveryCodes: string[] }> {
+    if (!dto || !dto.password || !dto.code) {
+      throw new BadRequestException('Password and fresh MFA verification code are required');
+    }
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
-    if (!user.mfaEnabled) {
+    if (!user || !user.isActive) throw new UnauthorizedException('Account not found or deactivated');
+    if (!user.mfaEnabled || !user.mfaSecret) {
       throw new BadRequestException('MFA is not enabled on this account');
     }
 
+    // Step-up factor 1: Verify current password
+    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!passwordValid) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    // Step-up factor 2: Verify fresh TOTP code with counter tracking
+    const plaintextSecret = this.mfaService.decryptSecret(user.mfaSecret);
+    const { valid, acceptedStep, code: validCode } = this.mfaService.verifyTotpCounter(
+      plaintextSecret,
+      dto.code,
+      user.mfaLastUsedStep,
+    );
+    if (!valid || !acceptedStep) {
+      throw new UnauthorizedException('Invalid or expired MFA code');
+    }
+
     const { plaintextCodes, hashedCodes } = this.mfaService.generateRecoveryCodes(10);
-    await this.prisma.user.update({
-      where: { id: userId },
+
+    // Atomic conditional update replacing codes and consuming step
+    const updateRes = await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        OR: [
+          { mfaLastUsedStep: null },
+          { mfaLastUsedStep: { lt: acceptedStep } },
+        ],
+      },
       data: {
         mfaRecoveryCodes: hashedCodes,
+        mfaLastUsedStep: acceptedStep,
+        mfaLastUsedCode: validCode,
       },
     });
+
+    if (updateRes.count === 0) {
+      throw new UnauthorizedException('MFA verification code has already been consumed (replay prevention)');
+    }
 
     return { recoveryCodes: plaintextCodes };
   }
